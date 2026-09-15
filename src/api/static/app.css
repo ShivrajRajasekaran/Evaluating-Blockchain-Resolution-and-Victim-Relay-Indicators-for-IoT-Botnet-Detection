@@ -1,0 +1,247 @@
+/* app.css — the dashboard's only stylesheet.
+ *
+ * First-party and self-hosted, with no CDN, no web font and no framework. That
+ * is what lets the Content-Security-Policy in api/security.py be strict
+ * without lying: this page really does load everything from itself.
+ *
+ * System font stack, because downloading a typeface would be an outbound
+ * request the containment rules forbid.
+ */
+
+:root {
+  color-scheme: light;
+  --bg: #f6f7f9;
+  --panel: #ffffff;
+  --ink: #15181d;
+  --ink-soft: #5b6472;
+  --line: #dfe3e9;
+  --accent: #1b4d8f;
+  --accent-ink: #ffffff;
+  --ok-bg: #e6f4ea;      --ok-ink: #17603a;
+  --warn-bg: #fdf2dc;    --warn-ink: #7a5310;
+  --err-bg: #fbe9e9;     --err-ink: #8c2020;
+  --sev-high: #a02020;
+  --sev-medium: #a05a10;
+  --sev-low: #1b4d8f;
+  --sev-info: #5b6472;
+  --radius: 6px;
+  --mono: ui-monospace, SFMono-Regular, "Cascadia Mono", Consolas,
+          "Liberation Mono", monospace;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font: 15px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+}
+
+.centered {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 24px 16px;
+}
+
+.skip {
+  position: absolute;
+  left: -9999px;
+}
+.skip:focus {
+  left: 8px; top: 8px; z-index: 10;
+  background: var(--panel); padding: 8px 12px; border-radius: var(--radius);
+}
+
+/* ---------- chrome ---------- */
+.topbar {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 16px;
+  padding: 10px 20px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--line);
+}
+.brand { font-weight: 650; display: flex; align-items: center; gap: 8px; }
+.brand a { color: var(--ink); text-decoration: none; }
+.brand .mark { color: var(--accent); }
+
+.nav { display: flex; flex-wrap: wrap; gap: 4px; flex: 1; }
+.nav a {
+  padding: 6px 10px; border-radius: var(--radius);
+  color: var(--ink-soft); text-decoration: none;
+}
+.nav a:hover { background: var(--bg); color: var(--ink); }
+.nav a[aria-current="page"] { background: var(--accent); color: var(--accent-ink); }
+
+.session { display: flex; align-items: center; gap: 10px; margin: 0; }
+.who { font-size: 13px; color: var(--ink-soft); }
+.who .role {
+  margin-left: 6px; padding: 1px 6px; border: 1px solid var(--line);
+  border-radius: 10px; font-size: 11px; text-transform: uppercase;
+}
+
+/* The review banner. Always visible, never subtle. */
+.banner {
+  margin: 0;
+  padding: 10px 20px;
+  background: var(--warn-bg);
+  color: var(--warn-ink);
+  border-bottom: 1px solid var(--line);
+  font-size: 13.5px;
+  font-weight: 550;
+}
+
+main { padding: 20px; max-width: 1180px; margin: 0 auto; }
+
+.foot {
+  display: flex; flex-wrap: wrap; gap: 12px; justify-content: space-between;
+  padding: 14px 20px; margin-top: 32px;
+  border-top: 1px solid var(--line);
+  color: var(--ink-soft); font-size: 12.5px;
+}
+
+/* ---------- type ---------- */
+h1 { font-size: 22px; margin: 4px 0 14px; }
+h2 { font-size: 16.5px; margin: 24px 0 8px; }
+h3.grouph {
+  font-size: 13px; text-transform: uppercase; letter-spacing: .04em;
+  color: var(--ink-soft); margin: 16px 0 6px;
+}
+.muted { color: var(--ink-soft); }
+.small { font-size: 12.5px; }
+.mono, code { font-family: var(--mono); font-size: .92em; }
+.num { text-align: right; font-variant-numeric: tabular-nums; }
+.sr-only {
+  position: absolute; width: 1px; height: 1px; overflow: hidden;
+  clip: rect(0 0 0 0); white-space: nowrap;
+}
+.crumb { margin: 0 0 8px; font-size: 13px; }
+
+/* ---------- panels ---------- */
+.card {
+  background: var(--panel); border: 1px solid var(--line);
+  border-radius: var(--radius); padding: 18px; margin: 12px 0;
+}
+.login { width: min(420px, 100%); }
+.login input { width: 100%; }
+
+.notice {
+  background: var(--panel); border: 1px solid var(--line);
+  border-left: 4px solid var(--accent);
+  border-radius: var(--radius); padding: 12px 14px; margin: 12px 0;
+}
+.notice.warn { border-left-color: var(--warn-ink); background: var(--warn-bg); }
+
+.flash { padding: 10px 14px; border-radius: var(--radius); margin: 12px 0; }
+.flash-error { background: var(--err-bg); color: var(--err-ink); }
+.flash-ok { background: var(--ok-bg); color: var(--ok-ink); }
+
+.tiles { display: flex; flex-wrap: wrap; gap: 12px; margin: 14px 0; }
+.tile {
+  flex: 1 1 150px; background: var(--panel); border: 1px solid var(--line);
+  border-radius: var(--radius); padding: 14px 16px;
+  display: flex; flex-direction: column; gap: 2px;
+}
+.tile-n { font-size: 26px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.tile-n.mono { font-size: 18px; font-family: var(--mono); }
+.tile-l { font-size: 12.5px; color: var(--ink-soft); }
+
+.cols { display: grid; grid-template-columns: 1fr; gap: 24px; }
+@media (min-width: 900px) { .cols { grid-template-columns: 1.6fr 1fr; } }
+
+/* ---------- tables ---------- */
+.scrollx { overflow-x: auto; }
+table.grid {
+  width: 100%; border-collapse: collapse; background: var(--panel);
+  border: 1px solid var(--line); border-radius: var(--radius);
+  margin: 8px 0; overflow: hidden;
+}
+table.grid th, table.grid td {
+  text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line);
+  vertical-align: top;
+}
+table.grid thead th {
+  background: var(--bg); font-size: 12px; text-transform: uppercase;
+  letter-spacing: .03em; color: var(--ink-soft);
+}
+table.grid tbody tr:last-child td { border-bottom: none; }
+table.grid.compact th, table.grid.compact td { padding: 5px 10px; }
+table.grid td.num, table.grid th.num { text-align: right; }
+
+/* ---------- badges ---------- */
+.pill {
+  display: inline-block; padding: 1px 8px; margin: 0 3px 3px 0;
+  border: 1px solid var(--line); border-radius: 10px;
+  font-size: 11.5px; background: var(--bg); color: var(--ink-soft);
+}
+.pill.ok { background: var(--ok-bg); color: var(--ok-ink); border-color: transparent; }
+.pill.warn { background: var(--warn-bg); color: var(--warn-ink); border-color: transparent; }
+
+.sev { font-weight: 650; font-size: 12px; letter-spacing: .03em; }
+.sev-high { color: var(--sev-high); }
+.sev-medium { color: var(--sev-medium); }
+.sev-low { color: var(--sev-low); }
+.sev-info { color: var(--sev-info); }
+
+/* ---------- forms ---------- */
+label { display: block; font-size: 12.5px; color: var(--ink-soft); margin: 10px 0 3px; }
+input, select, textarea {
+  font: inherit; padding: 7px 9px; border: 1px solid var(--line);
+  border-radius: var(--radius); background: var(--panel); color: var(--ink);
+}
+input:focus, select:focus, textarea:focus, button:focus-visible, a:focus-visible {
+  outline: 2px solid var(--accent); outline-offset: 1px;
+}
+textarea { width: 100%; resize: vertical; }
+
+button, .btn {
+  display: inline-block; font: inherit; padding: 7px 13px; cursor: pointer;
+  border: 1px solid var(--line); border-radius: var(--radius);
+  background: var(--panel); color: var(--ink); text-decoration: none;
+}
+button:hover, .btn:hover { background: var(--bg); }
+button.primary {
+  background: var(--accent); color: var(--accent-ink); border-color: var(--accent);
+}
+button.link {
+  border: none; background: none; color: var(--accent); padding: 0;
+  text-decoration: underline;
+}
+
+.stack { display: flex; flex-direction: column; gap: 2px; margin: 14px 0; }
+.stack button { margin-top: 10px; align-self: flex-start; }
+
+.filters {
+  display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px;
+  background: var(--panel); border: 1px solid var(--line);
+  border-radius: var(--radius); padding: 12px 14px; margin: 12px 0;
+}
+.filters label { margin: 0 0 3px; }
+.filters > * { flex: 0 0 auto; }
+
+.pager { display: flex; align-items: center; gap: 12px; margin: 14px 0; }
+
+/* ---------- detail ---------- */
+.detail-head .ids { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+dl.kv { display: grid; grid-template-columns: auto 1fr; gap: 4px 14px; margin: 8px 0; }
+dl.kv dt { color: var(--ink-soft); font-size: 12.5px; }
+dl.kv dd { margin: 0; }
+
+ol.timeline { list-style: none; padding: 0; margin: 8px 0; }
+ol.timeline li {
+  border-left: 2px solid var(--line); padding: 4px 0 10px 12px;
+}
+ol.timeline p { margin: 4px 0 0; }
+
+tr.ev-coverage { background: var(--warn-bg); }
+
+.docs { max-width: 1000px; }
+
+/* ---------- print ---------- */
+@media print {
+  .topbar, .foot, .noprint, .nav, .session { display: none !important; }
+  body { background: #fff; }
+  .banner { background: #fff; border: 1px solid #000; }
+  table.grid { border-color: #000; }
+}

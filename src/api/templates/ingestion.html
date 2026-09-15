@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}Ingestion · {{ product_name }}{% endblock %}
+{% block content %}
+<h1>Ingestion history</h1>
+
+<h2>Jobs</h2>
+{% if jobs %}
+<table class="grid">
+  <thead><tr><th scope="col">Job</th><th scope="col">Source</th><th scope="col">Status</th>
+             <th scope="col">Flows</th><th scope="col">Windows</th>
+             <th scope="col">Started</th><th scope="col">Finished</th><th scope="col">Note</th></tr></thead>
+  <tbody>
+  {% for j in jobs %}
+    <tr>
+      <td class="num">{{ j.id }}</td>
+      <td class="mono">{{ j.source_dataset }}</td>
+      <td><span class="pill {{ 'ok' if j.status == 'succeeded' else ('warn' if j.status == 'failed' else '') }}">{{ j.status }}</span></td>
+      <td class="num">{{ j.flows_read if j.flows_read is not none else '—' }}</td>
+      <td class="num">{{ j.windows_emitted if j.windows_emitted is not none else '—' }}</td>
+      <td class="small mono">{{ j.started_at or '—' }}</td>
+      <td class="small mono">{{ j.finished_at or '—' }}</td>
+      <td class="small">{{ j.error or j.note or '—' }}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% else %}<p class="muted">No ingest jobs yet.</p>{% endif %}
+
+<h2>Uploaded files</h2>
+<p class="muted small">Server storage paths are deliberately not shown. The
+  original filename is display-only and was never used to build a path.</p>
+{% if uploads %}
+<table class="grid">
+  <thead><tr><th scope="col">File</th><th scope="col">Format hint</th><th scope="col">Size</th>
+             <th scope="col">SHA-256</th><th scope="col">Uploaded</th></tr></thead>
+  <tbody>
+  {% for u in uploads %}
+    <tr>
+      <td class="small">{{ u.original_filename }}</td>
+      <td class="mono small">{{ u.source_hint or '—' }}</td>
+      <td class="num">{{ u.size_bytes }}</td>
+      <td class="mono small">{{ u.sha256[:16] }}…</td>
+      <td class="small mono">{{ u.uploaded_at }}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% else %}<p class="muted">Nothing uploaded yet.</p>{% endif %}
+{% endblock %}

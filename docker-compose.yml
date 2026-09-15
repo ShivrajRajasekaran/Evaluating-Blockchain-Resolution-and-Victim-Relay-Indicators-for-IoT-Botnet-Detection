@@ -1,0 +1,93 @@
+# docker-compose.yml — local deployment.
+#
+# WRITTEN, NOT RUN. Bringing this up is an approval-gated action; see
+# docs/deployment-guide.md.
+#
+#   docker compose up --build          # the product on 127.0.0.1:8000
+#   docker compose --profile postgres up   # NOT ACTIVE — see the note below
+
+services:
+  app:
+    build: .
+    image: als:1.0.0
+    container_name: als-app
+
+    # THE HOST BINDING IS THE SECURITY BOUNDARY.
+    # "127.0.0.1:8000:8000" — not "8000:8000". The short form publishes on
+    # 0.0.0.0 and Docker inserts its own iptables rules, which routinely
+    # bypasses a host firewall people believe is protecting them. The explicit
+    # loopback prefix is what keeps this deployment local.
+    ports:
+      - "127.0.0.1:8000:8000"
+
+    environment:
+      # Required. Read from the host environment or a local .env file; never
+      # written into this committed file.
+      PRODUCT_SESSION_SECRET: "${PRODUCT_SESSION_SECRET:?set PRODUCT_SESSION_SECRET, e.g. in .env}"
+
+    volumes:
+      # The database and uploaded captures persist on the host.
+      - ./data:/app/data
+      # Configuration is read-only to the container: the running product has no
+      # reason to rewrite its own detection thresholds.
+      - ./configs:/app/configs:ro
+
+    restart: unless-stopped
+
+    # Defence in depth. The app writes only under /app/data, so everything else
+    # can be immutable, and it needs no Linux capability at all.
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=2).status == 200 else 1)"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ---------------------------------------------------------------------------
+  # PostgreSQL — DEFINED, PROFILE-GATED, AND NOT ACTIVE IN THIS BUILD.
+  # ---------------------------------------------------------------------------
+  # It starts only with `--profile postgres`, and even then the application
+  # ignores it until BOTH of these are true:
+  #     1. psycopg2 is installed (see pyproject.toml [project.optional-dependencies])
+  #     2. storage.postgres.enabled is set true in configs/default.yaml
+  #
+  # It is written out rather than left to a future improvisation: the
+  # repository layer already speaks portable parameterised SQL, so switching
+  # backends should be a configuration change reviewed against this file, not a
+  # rewrite under time pressure.
+  postgres:
+    profiles: ["postgres"]
+    image: postgres:16-alpine
+    container_name: als-postgres
+    environment:
+      POSTGRES_DB: als
+      POSTGRES_USER: als
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}"
+    # Loopback only, for the same reason as the app.
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U als -d als"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  postgres_data:

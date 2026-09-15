@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>API reference · {{ product_name }}</title>
+  <link rel="stylesheet" href="/static/app.css?v={{ build_token }}">
+</head>
+<body>
+<main id="main" class="docs">
+  <h1>{{ spec.info.title }} — API reference</h1>
+  <p class="banner" role="note">{{ banner }}</p>
+  <p>{{ spec.info.description }}</p>
+  <p class="muted small">Served from this deployment only. Machine-readable at
+    <a href="/openapi.json">/openapi.json</a>. This page loads no external
+    script, stylesheet or font.</p>
+
+  <h2>Authentication</h2>
+  <p>Sign in at <code>POST /login</code>; the response sets a signed session
+     cookie. There is no API key — nothing here needs unattended machine
+     access, and a long-lived key would be one more secret to leak. Mutating
+     routes additionally require the <code>X-CSRF-Token</code> header.</p>
+
+  <h2>Roles</h2>
+  <table class="grid compact">
+    <thead><tr><th scope="col">Role</th><th scope="col">Permissions</th></tr></thead>
+    <tbody>
+    {% for role, perms in spec['x-roles'].items() %}
+      <tr><td>{{ role }}</td><td class="mono small">{{ perms | join(', ') }}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+
+  <h2>Endpoints</h2>
+  <div class="scrollx">
+  <table class="grid">
+    <thead><tr><th scope="col">Method</th><th scope="col">Path</th>
+               <th scope="col">Permission</th><th scope="col">CSRF</th>
+               <th scope="col">Description</th></tr></thead>
+    <tbody>
+    {% for path, ops in spec.paths.items() %}
+      {% for method, op in ops.items() %}
+      <tr>
+        <td class="mono">{{ method | upper }}</td>
+        <td class="mono small">{{ path }}</td>
+        <td class="small">
+          {% if op['x-permission'] %}{{ op['x-permission'] }}
+          {% elif op['x-requires-session'] %}any signed-in role
+          {% else %}anonymous{% endif %}
+        </td>
+        <td>{% if op['x-requires-csrf'] %}required{% else %}—{% endif %}</td>
+        <td class="small">{{ op.summary }}</td>
+      </tr>
+      {% endfor %}
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  <p><a href="/">Back to the dashboard</a></p>
+</main>
+</body>
+</html>

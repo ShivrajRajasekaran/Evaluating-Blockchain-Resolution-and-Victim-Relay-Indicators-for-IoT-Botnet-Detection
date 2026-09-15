@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+{% block title %}{{ alert.category_label }} · {{ product_name }}{% endblock %}
+{% block content %}
+<p class="crumb"><a href="/alerts">← All alerts</a></p>
+
+<header class="detail-head">
+  <h1>{{ alert.category_label }}</h1>
+  <p class="ids">
+    <span class="sev sev-{{ alert.severity|lower }}">{{ alert.severity }}</span>
+    <span class="pill">{{ alert.confidence }} confidence</span>
+    <span class="pill">{{ alert.status }}</span>
+    <code>{{ alert.alert_uid }}</code>
+  </p>
+</header>
+
+{# The honesty statement is the first thing on the page, not a footnote. #}
+<p class="notice"><strong>This is not a confirmed incident.</strong>
+  {{ alert.category }} means transparent rules fired on observed metadata for
+  this device-window. {{ marker }}</p>
+
+{% if alert.coverage_note %}
+<p class="notice warn"><strong>Partial telemetry.</strong> {{ alert.coverage_note }}</p>
+{% endif %}
+
+<section class="cols">
+  <div>
+    <h2>What fired</h2>
+    <p>{{ alert.explanation }}</p>
+    <h2>Evidence</h2>
+    {% if alert.evidence %}
+    <table class="grid">
+      <thead><tr><th scope="col">Kind</th><th scope="col">Name</th><th scope="col">Value</th></tr></thead>
+      <tbody>
+      {% for e in alert.evidence %}
+        <tr class="ev-{{ e.kind }}">
+          <td><span class="pill {{ 'warn' if e.kind == 'coverage' else '' }}">{{ e.kind }}</span></td>
+          <td class="mono small">{{ e.name }}</td>
+          <td class="mono small">{{ e.value }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% else %}<p class="muted">No evidence rows recorded.</p>{% endif %}
+
+    {% if features %}
+    <h2>Measured features for this window</h2>
+    <p class="muted small">A feature shown as <em>not measurable</em> was NaN in
+      the source. It is never stored or displayed as 0 — for several of these
+      features zero is the most suspicious value, not a neutral one.</p>
+    {% for group, cols in feature_groups.items() %}
+    <h3 class="grouph">{{ group }}</h3>
+    <table class="grid compact">
+      <tbody>
+      {% for col in cols %}
+        <tr>
+          <td class="mono small">{{ col }}</td>
+          <td class="num mono small">
+            {% if features.get(col) is none %}<span class="muted">not measurable</span>
+            {% else %}{{ '%.4g'|format(features.get(col)) }}{% endif %}
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% endfor %}
+    {% endif %}
+  </div>
+
+  <aside>
+    <h2>Details</h2>
+    <dl class="kv">
+      <dt>Device</dt><dd class="mono small">{{ alert.device_key }}</dd>
+      <dt>Windows seen</dt><dd>{{ alert.occurrence_count }}</dd>
+      <dt>First seen</dt><dd class="mono small">{{ alert.first_seen }}</dd>
+      <dt>Last seen</dt><dd class="mono small">{{ alert.last_seen }}</dd>
+      <dt>Source file</dt><dd class="small">{{ alert.source_file or '—' }}</dd>
+      <dt>Detector</dt><dd class="mono small">{{ alert.provenance }} / {{ alert.detection_version }}</dd>
+      <dt>Category</dt><dd class="mono small">{{ alert.category }}</dd>
+    </dl>
+    <p><a class="btn" href="/alerts/{{ alert.id }}/print">Printable report</a></p>
+
+    {% if can.triage %}
+    <h2>Triage</h2>
+    {% if alert.allowed_transitions %}
+    <form method="post" action="/alerts/{{ alert.id }}/status" class="stack">
+      <input type="hidden" name="{{ CSRF_FIELD }}" value="{{ csrf_token(request) }}">
+      <label for="status">Move to</label>
+      <select id="status" name="status" required>
+        {% for s in alert.allowed_transitions %}<option value="{{ s }}">{{ s }}</option>{% endfor %}
+      </select>
+      <label for="disposition">Disposition (optional)</label>
+      <select id="disposition" name="disposition">
+        <option value="">—</option>
+        {% for d in dispositions %}<option value="{{ d }}">{{ d.replace('_', ' ') }}</option>{% endfor %}
+      </select>
+      <label for="comment">Note (optional)</label>
+      <textarea id="comment" name="comment" rows="2"></textarea>
+      <button type="submit" class="primary">Update status</button>
+    </form>
+    {% else %}
+    <p class="muted">No further transitions are available from {{ alert.status }}.</p>
+    {% endif %}
+
+    <form method="post" action="/alerts/{{ alert.id }}/feedback" class="stack">
+      <input type="hidden" name="{{ CSRF_FIELD }}" value="{{ csrf_token(request) }}">
+      <label for="note">Add a note without changing status</label>
+      <textarea id="note" name="comment" rows="2" required></textarea>
+      <button type="submit">Add note</button>
+    </form>
+    {% endif %}
+
+    <h2>History</h2>
+    {% if alert.feedback %}
+    <ol class="timeline">
+      {% for f in alert.feedback %}
+      <li>
+        <span class="mono small">{{ f.created_at }}</span>
+        {% if f.from_status != f.to_status %}
+          <strong>{{ f.from_status }} → {{ f.to_status }}</strong>
+        {% else %}<strong>note</strong>{% endif %}
+        {% if f.disposition %}<span class="pill">{{ f.disposition.replace('_', ' ') }}</span>{% endif %}
+        {% if f.comment %}<p>{{ f.comment }}</p>{% endif %}
+      </li>
+      {% endfor %}
+    </ol>
+    {% else %}<p class="muted">No analyst activity yet.</p>{% endif %}
+  </aside>
+</section>
+{% endblock %}

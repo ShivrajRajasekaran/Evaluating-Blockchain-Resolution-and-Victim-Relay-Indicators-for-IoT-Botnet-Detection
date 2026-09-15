@@ -1,0 +1,59 @@
+{# base.html — every page's frame.
+   The review banner is rendered HERE, once, so no individual page can be
+   built that omits it. #}
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <title>{% block title %}{{ product_name }}{% endblock %}</title>
+  <link rel="stylesheet" href="/static/app.css?v={{ build_token }}">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="topbar">
+  <div class="brand">
+    <span class="mark" aria-hidden="true">◆</span>
+    <a href="/">{{ product_name }}</a>
+  </div>
+  {% if session %}
+  <nav class="nav" aria-label="Main">
+    <a href="/" {% if active == 'overview' %}aria-current="page"{% endif %}>Overview</a>
+    <a href="/alerts" {% if active in ('alerts', 'alert_detail') %}aria-current="page"{% endif %}>Alerts</a>
+    <a href="/devices" {% if active == 'devices' %}aria-current="page"{% endif %}>Devices</a>
+    <a href="/ingestion" {% if active == 'ingestion' %}aria-current="page"{% endif %}>Ingestion</a>
+    {% if can.upload %}<a href="/upload" {% if active == 'upload' %}aria-current="page"{% endif %}>Upload</a>{% endif %}
+    {% if can.view_config %}<a href="/detection" {% if active == 'detection' %}aria-current="page"{% endif %}>Detection</a>{% endif %}
+    <a href="/reports" {% if active == 'reports' %}aria-current="page"{% endif %}>Reports</a>
+    {% if can.view_audit %}<a href="/audit" {% if active == 'audit' %}aria-current="page"{% endif %}>Audit</a>{% endif %}
+  </nav>
+  <form class="session" method="post" action="/logout">
+    <span class="who">{{ session.username }}<span class="role">{{ session.role }}</span></span>
+    <button type="submit" class="link">Sign out</button>
+  </form>
+  {% endif %}
+</header>
+
+{# VERBATIM, on every page. A tool that reads metadata cannot confirm a
+   compromise, and must not appear to. #}
+<p class="banner" role="note">{{ banner }}</p>
+
+<main id="main">
+  {% if request.query_params.get('error') %}
+    <p class="flash flash-error" role="alert">{{ request.query_params.get('error') }}</p>
+  {% endif %}
+  {% if request.query_params.get('updated') %}
+    <p class="flash flash-ok" role="status">Saved.</p>
+  {% endif %}
+  {% block content %}{% endblock %}
+</main>
+
+<footer class="foot">
+  <span>{{ marker }}</span>
+  <span>Local-only deployment · authorised log analytics · no outbound network calls</span>
+</footer>
+<script src="/static/app.js?v={{ build_token }}"></script>
+</body>
+</html>

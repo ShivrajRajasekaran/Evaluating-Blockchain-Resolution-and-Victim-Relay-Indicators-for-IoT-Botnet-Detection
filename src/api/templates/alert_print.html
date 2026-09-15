@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}Report {{ alert.alert_uid }}{% endblock %}
+{% block content %}
+<article class="print">
+  <h1>Indicator review report</h1>
+  <p class="notice"><strong>{{ banner }}</strong></p>
+
+  <dl class="kv">
+    <dt>Alert</dt><dd class="mono">{{ alert.alert_uid }}</dd>
+    <dt>Pattern</dt><dd>{{ alert.category_label }} (<code>{{ alert.category }}</code>)</dd>
+    <dt>Severity</dt><dd>{{ alert.severity }}</dd>
+    <dt>Confidence</dt><dd>{{ alert.confidence }}</dd>
+    <dt>Device</dt><dd class="mono">{{ alert.device_key }}</dd>
+    <dt>Windows</dt><dd>{{ alert.occurrence_count }} ({{ alert.first_seen }} → {{ alert.last_seen }})</dd>
+    <dt>Source file</dt><dd>{{ alert.source_file or '—' }}</dd>
+    <dt>Detector</dt><dd class="mono">{{ alert.provenance }} / {{ alert.detection_version }}</dd>
+    <dt>Status</dt><dd>{{ alert.status }}</dd>
+    <dt>Generated</dt><dd class="mono">{{ generated_at }}</dd>
+  </dl>
+
+  <h2>Evidence</h2>
+  <p>{{ alert.explanation }}</p>
+  {% if alert.coverage_note %}
+  <h2>Telemetry limitations</h2>
+  <p>{{ alert.coverage_note }}</p>
+  {% endif %}
+
+  {% if alert.evidence %}
+  <table class="grid">
+    <thead><tr><th scope="col">Kind</th><th scope="col">Name</th><th scope="col">Value</th></tr></thead>
+    <tbody>
+    {% for e in alert.evidence %}<tr><td>{{ e.kind }}</td><td class="mono small">{{ e.name }}</td><td class="mono small">{{ e.value }}</td></tr>{% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+
+  {% if alert.feedback %}
+  <h2>Analyst history</h2>
+  <ul>
+  {% for f in alert.feedback %}
+    <li><span class="mono small">{{ f.created_at }}</span> —
+      {% if f.from_status != f.to_status %}{{ f.from_status }} → {{ f.to_status }}{% else %}note{% endif %}
+      {% if f.disposition %}({{ f.disposition.replace('_', ' ') }}){% endif %}
+      {% if f.comment %}: {{ f.comment }}{% endif %}</li>
+  {% endfor %}
+  </ul>
+  {% endif %}
+
+  <h2>Provenance</h2>
+  <p class="small">{{ provenance_note }}</p>
+  <p class="small"><strong>{{ marker }}</strong></p>
+  <p class="noprint"><button type="button" onclick="window.print()">Print</button>
+     <a class="btn" href="/alerts/{{ alert.id }}">Back to alert</a></p>
+</article>
+{% endblock %}

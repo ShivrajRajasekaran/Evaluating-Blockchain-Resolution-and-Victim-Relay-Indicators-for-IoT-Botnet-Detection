@@ -1,0 +1,347 @@
+# ===========================================================================
+# default.yaml — every tunable in the project, in one place.
+#
+# Project: Evaluating Blockchain-Resolution and Victim-Relay Indicators
+#          for IoT Botnet Detection
+#
+# Anything that changes a NUMBER in results/ lives here. Anything that changes
+# the MEANING of a column lives in src/schema/columns.py instead (the window
+# size, the class taxonomy, the feature ranges) — those are not tunable,
+# because two runs with different values are not comparable.
+#
+# Load with:  from src.config import load_config;  cfg = load_config()
+# Override:   load_config("configs/experiment_xyz.yaml")
+# ===========================================================================
+
+project:
+  title: "Evaluating Blockchain-Resolution and Victim-Relay Indicators for IoT Botnet Detection"
+  short_title: "Blockchain-Resolution & Victim-Relay Indicators for IoT Botnet Detection"
+  research_question: >-
+    Do blockchain-resolution and victim-relay indicator groups add measurable
+    detection value beyond conventional IoT-botnet features, while maintaining
+    a low false-positive rate on real benign IoT traffic?
+
+# ---------------------------------------------------------------------------
+# Reproducibility
+# ---------------------------------------------------------------------------
+seeds:
+  primary: 42
+  # Multi-seed robustness. `split` varies the split/model seed on one fixed
+  # dataset; `generator` regenerates the dataset itself. The second is the
+  # larger source of variation and the one that gets reported.
+  split: [42, 7, 123, 2024, 99]
+  generator: [42, 7, 123, 2024, 99]
+
+# ---------------------------------------------------------------------------
+# Evaluation protocol
+# ---------------------------------------------------------------------------
+evaluation:
+  test_size: 0.30          # of the whole dataset; LOCKED, scored once
+  val_size: 0.20           # of the remaining train+val portion
+  target_fpr: 0.01         # common false-positive budget for threshold matching
+  n_bootstrap: 1000        # resamples for confidence intervals
+
+  # "group"    — no device_id appears in more than one split (default)
+  # "temporal" — train on earlier windows, test on later ones
+  # "random"   — stratified rows only; kept ONLY to reproduce the prototype's
+  #              published numbers for comparison. Not valid for new claims.
+  split_strategy: "group"
+
+  # Bootstrap resampling unit. Under a grouped split, rows from one device are
+  # correlated; resampling rows independently understates the interval and makes
+  # a null result look more decisive than the data supports.
+  bootstrap_unit: "group"   # "group" | "row"
+
+  # Minimum windows a device must contribute to be usable for grouped splits.
+  min_windows_per_device: 1
+
+# ---------------------------------------------------------------------------
+# Incremental-value protocol — the headline experiment (Track B)
+# ---------------------------------------------------------------------------
+# Build UP from the generic-signal base and measure what the novel groups add.
+# Drop-one ablation cannot answer this when groups correlate: removing a
+# redundant-but-informative group costs nothing, which is indistinguishable
+# from removing a useless one.
+incremental:
+  base_groups: ["infection", "payload"]
+  sets:
+    "base (infection+payload)":  ["infection", "payload"]
+    "base + resolution":         ["infection", "payload", "resolution"]
+    "base + relay":              ["infection", "payload", "relay"]
+    "base + resolution + relay": ["infection", "payload", "resolution", "relay"]
+
+# ---------------------------------------------------------------------------
+# Track B — local mock generation
+# ---------------------------------------------------------------------------
+# STANDING RULE, enforced by tests/test_mock_generator.py (TestGeneratorConstants):
+#   Do NOT widen the class distributions to make the thesis look confirmed.
+#   If the novel groups show no independent value, the correct response is to
+#   ground the features in observable events and build better benign controls.
+#   Tuning these numbers until the result is favourable is fabrication.
+mock:
+  n_devices_benign: 800
+  n_devices_malicious: 120
+  windows_per_device: 10        # -> 8,000 benign + 1,200 malicious windows,
+                                #    matching the prototype's nominal counts
+  label_noise: 0.02             # fraction of labels flipped (annotation error)
+  start_time: "2026-01-06T00:00:00"   # fixed: no wall-clock in a seeded run
+
+  # How malicious behaviour is distributed across the novel feature groups.
+  #   "scenario" — three subtypes, mirroring a testbed where the mock resolver
+  #                and the mock relay are toggled independently. A device in the
+  #                resolver-only scenario draws its RELAY features from the
+  #                benign distribution, because it genuinely is not relaying.
+  #                This makes the malicious class harder to separate on the novel
+  #                groups, never easier.
+  #   "parity"    — every malicious device expresses all four groups, exactly as
+  #                 the prototype did. Kept as a regression check that the
+  #                 enterprise pipeline does not quietly change the science.
+  class_model: "scenario"
+
+  # Share of malicious devices assigned to each Track-B class (class_model:
+  # scenario only). Applied as deterministic counts, not a multinomial draw:
+  # with 120 devices a random draw wobbles the balance by several devices between
+  # seeds, and that wobble would surface in results as if it were a finding.
+  class_mix:
+    blockchain_resolution_mock: 0.30
+    victim_relay_mock: 0.30
+    combined_mock: 0.40
+
+  # Window timing. Each device is observed for one 5-minute window per stride,
+  # so 10 windows span ~10 hours.
+  #
+  # The stride is deliberately much larger than the window: if every device were
+  # observed in one contiguous burst, a temporal split would cut between devices
+  # and become indistinguishable from a grouped split. Keeping them decoupled
+  # makes the two protocols answer different questions — grouped tests
+  # generalisation to unseen devices, temporal to a later period.
+  window_stride_seconds: 3600
+  device_stagger_seconds: 300   # devices start at staggered offsets (12 phases)
+  # Share of benign devices that are "chatty" — they legitimately beacon to a
+  # cloud endpoint, open UPnP mappings and pull config lists. Without these the
+  # benign class is trivially separable and every metric is meaningless.
+  benign_chatty_fraction: 0.35
+  benign_heartbeat_fraction: 0.45
+
+# ---------------------------------------------------------------------------
+# Track A — IoT-23 adapter
+# ---------------------------------------------------------------------------
+iot23:
+  # A device-window must contain at least this many flows to be emitted.
+  # Below it, per-window rates and entropies are dominated by sampling noise.
+  # Windows below the bar are still emitted, but carry FLAG_LOW_FLOW_COUNT —
+  # dropping them would bias the sample toward busy devices.
+  min_flows_per_window: 3
+  # A multi-flow window whose flows all arrived inside this span is a burst, not
+  # five minutes of behaviour, so its per-minute rates understate the
+  # instantaneous rate. Raises FLAG_SHORT_WINDOW.
+  min_span_seconds: 60
+  # Ports treated as credential-attack targets for the login_burst_count proxy.
+  login_ports: [22, 23, 2323, 5555]
+  # Zeek conn_state values counted as failed connections.
+  failed_conn_states: ["S0", "REJ", "RSTOS0", "RSTRH", "SH", "SHR"]
+
+  # The two halves of the rpc_endpoint_ratio proxy: numerator = flows to an
+  # rpc_proxy_port, denominator = flows to either list. See
+  # src/features/derive.py and docs/feature-catalogue.md.
+  resolver_ports: [53, 5353]           # standard name resolution: DNS, mDNS
+  rpc_proxy_ports: [8545, 8546]        # Ethereum JSON-RPC (HTTP, WebSocket)
+  #
+  # 443 AND 8443 WERE DELIBERATELY REMOVED FROM rpc_proxy_ports.
+  # Public Ethereum RPC providers do serve over 443, so on the face of it they
+  # belong here. But conn.log.labeled carries no SNI and no payload, so
+  # RPC-over-HTTPS is indistinguishable from ordinary HTTPS. Including 443 put
+  # the ratio near 1.0 for almost every device and produced a strong-looking
+  # feature that actually measures "this device uses TLS" — a capture-artefact
+  # signal, not a resolution signal.
+  # The expected honest result on IoT-23 is now ~0.0 almost everywhere. That is
+  # the finding, not a failure: IoT-23 predates blockchain-anchored C2 and
+  # contains no observable JSON-RPC traffic. It is recorded in
+  # docs/limitations.md.
+  # Cap on flows read from a conn.log.labeled, so a 8.8 GB file can be
+  # smoke-tested before a full run. null = no limit.
+  max_flows: null
+
+# ---------------------------------------------------------------------------
+# Models
+# ---------------------------------------------------------------------------
+models:
+  heuristic:
+    vote_threshold: 3
+  random_forest:
+    n_estimators: 300
+    max_depth: null
+    class_weight: "balanced"
+  xgboost:
+    n_estimators: 400
+    max_depth: 5
+    learning_rate: 0.08
+    subsample: 0.9
+    colsample_bytree: 0.9
+
+explainability:
+  permutation_repeats: 10
+  permutation_scoring: "f1"
+  # Tree gain importance is computed on TRAINING data and is biased toward
+  # continuous / high-cardinality features. Reported alongside permutation
+  # importance for contrast only; never cited as a finding.
+  report_gain_importance: true
+
+# ---------------------------------------------------------------------------
+# Detection service (offline scoring only)
+# ---------------------------------------------------------------------------
+# Containment: reads a local CSV, writes a local CSV. It opens no socket, binds
+# no port, resolves no name and forwards no packet. See
+# docs/ethics-and-containment.md.
+service:
+  abstain_below_confidence: 0.15   # |p - threshold| under this -> abstain
+  abstain_on_schema_failure: true
+  abstain_on_missing_features: true
+  max_rows_per_request: 100000
+
+# ===========================================================================
+# OPERATIONAL PRODUCT (everything above this line is the offline research
+# pipeline; everything below runs the local-first detection product).
+#
+# These blocks tune the product; they never change a NUMBER in results/. They
+# hold NO secrets — the session-signing key and any database URL are read from
+# the environment (see auth.session_secret_env / storage.postgres.dsn_env), so
+# this file is safe to commit. Two strings here are load-bearing and verbatim:
+# product.review_banner and detection.rule_marker; tests pin both.
+# ===========================================================================
+
+product:
+  name: "Authorised Log Analytics — IoT Botnet Indicator Review"
+  # Shown on every dashboard page and stamped into every exported report.
+  # VERBATIM — do not soften. A tool that reads metadata and classifies shapes
+  # cannot confirm a compromise, and must not appear to.
+  review_banner: >-
+    Alerts indicate suspicious behavioural patterns and require analyst review.
+    They are not confirmation of compromise.
+  # The only directory scripts/ingest_file.py will read from, besides an
+  # authenticated upload. Nothing else on disk is ever opened for ingest.
+  input_dir: "data/authorised_input"
+  # Attached to any run over operational telemetry: unlabelled => review-only.
+  operational_note: >-
+    Operational telemetry is unlabelled, enterprise-owned network metadata. The
+    product derives device-window features and applies transparent rules; it
+    never trains on this data and never confirms compromise. Every positive is a
+    suspicious indicator pattern requiring analyst review.
+
+storage:
+  backend: "sqlite"                 # "sqlite" (dev + this build) | "postgres" (gated)
+  sqlite_path: "data/product/app.db"
+  # Governance controls.
+  pseudonymise_devices: true        # persist salted-hash pseudonyms, not raw IDs
+  retention_days: 90                # audited admin purge deletes rows older than this
+  # PostgreSQL: the repository layer uses parameterised, portable SQL, but
+  # Postgres is NOT activated in this build (needs psycopg2 + approval). Kept
+  # here documented and disabled so switching later is a config change, not a
+  # rewrite. The DSN is read from the environment, never stored in this file.
+  postgres:
+    enabled: false
+    dsn_env: "PRODUCT_DATABASE_URL"
+
+auth:
+  # PBKDF2-HMAC-SHA256. Deliberately expensive; raise as hardware allows. The
+  # verify path is intentionally slow — it rate-limits offline brute force.
+  pbkdf2_iterations: 600000         # OWASP 2023 floor for PBKDF2-HMAC-SHA256
+  salt_bytes: 16
+  # The cookie-signing secret is read from THIS environment variable and never
+  # stored on disk. If it is unset, the server refuses to start (fail closed).
+  session_secret_env: "PRODUCT_SESSION_SECRET"
+  session_max_age_seconds: 28800    # 8 hours
+  session_cookie_name: "als_session"
+  cookie_secure: false              # set true behind HTTPS; local http dev = false
+  # Roles, most-privileged first. Admin: users+audit+config+purge; Analyst:
+  # triage+feedback+status; Viewer: read-only.
+  roles: ["Admin", "Analyst", "Viewer"]
+
+api:
+  host: "127.0.0.1"                 # LOCAL-ONLY bind. Do not change without approval.
+  port: 8000
+  # Upload controls. Filenames are never trusted; files are stored under the
+  # jobs directory with generated names (path-traversal proof).
+  max_upload_bytes: 26214400        # 25 MiB hard cap per uploaded file
+  allowed_extensions: [".log", ".labeled", ".csv", ".tsv", ".txt"]
+  # Token-bucket rate limit, keyed by (user, route).
+  rate_limit:
+    capacity: 60                    # burst size
+    refill_per_second: 1.0
+  # Alert-table and audit-view pagination.
+  page_size: 50
+  max_page_size: 200
+  # Structured application logging (no secrets, no PII beyond pseudonyms).
+  log:
+    level: "INFO"
+    json: true
+    request_id_header: "X-Request-ID"
+
+detection:
+  # The default engine is the transparent rule baseline. It is ALWAYS available,
+  # needs no trained model, and tags every alert it raises with this marker.
+  mode: "rule"                      # "rule" (default) | "model" (gated below)
+  rule_marker: "Rule-based detection; not ML-validated."
+
+  # Coarse confidence band from the rule vote fraction (fired / total rules).
+  # Deliberately coarse: a rule baseline has no calibrated probability, and a
+  # precise-looking number would overstate what it actually knows.
+  confidence_bands:
+    medium_at: 0.34                 # frac >= this  => at least "medium"
+    high_at: 0.67                   # frac >= this  => "high"; below medium_at => "low"
+
+  # Severity from (fired-rule count) x (distinct indicator groups that fired).
+  # The engine applies the highest-severity rule whose thresholds are all met,
+  # else `default`. Config-driven so an operator retunes without touching code.
+  severity:
+    default: "INFO"
+    rules:
+      - {min_votes: 1, min_groups: 1, severity: "LOW"}
+      - {min_votes: 2, min_groups: 1, severity: "MEDIUM"}
+      - {min_votes: 3, min_groups: 2, severity: "HIGH"}
+    # A resolution+relay co-occurrence is this project's signal of interest, so
+    # a combined pattern is floored here even at a low vote count.
+    combined_floor: "MEDIUM"
+
+  # Coverage gating — the honesty rule. A group whose feature coverage (fraction
+  # of its features that are non-NaN for the window) is <= min_group_coverage is
+  # NOT judged benign; it yields INSUFFICIENT_TELEMETRY with an explicit reason.
+  # Default 0.0 gates only a group that is entirely absent for the source.
+  coverage:
+    min_group_coverage: 0.0
+    resolution_reason: >-
+      Resolution indicators require resolver/DNS/HTTP telemetry absent from this
+      source, so no resolution judgement can be made.
+    relay_reason: >-
+      Relay indicators require bidirectional-payload/UPnP telemetry only
+      partially present in this source.
+
+  # ML mode: DISABLED. It stays refused until an authorised labelled dataset and
+  # a registered, validated model version exist. When enabled, the model gate
+  # still refuses to score unless a detection_models row records training-data
+  # provenance, validation metrics, a calibrated threshold, and a matching
+  # feature schema. No model trained on synthetic data is ever presented here.
+  model:
+    enabled: false
+    require_validation_metrics: true
+    require_calibrated_threshold: true
+    require_schema_match: true
+
+alerts:
+  # Repeated device-windows showing the SAME indicator pattern coalesce into one
+  # alert whose occurrence_count is bumped, so a device that beacons all day is
+  # one row to triage rather than two hundred and eighty-eight. The bucket is
+  # deliberately coarse: an analyst wants "this device, this pattern, still
+  # happening", not one alert per five-minute window.
+  dedup_window_hours: 24
+  # A recurrence may RAISE an existing alert's severity but never lower it. A
+  # device whose pattern broadens mid-day should get louder, and a later quiet
+  # window must not quietly downgrade evidence an analyst has already seen.
+  escalate_severity: true
+  # The status every new alert opens in. The lifecycle itself (which transitions
+  # are legal) lives in code — it is a workflow invariant, not a tunable.
+  initial_status: "Open"
+  # Cap on alerts written by ONE detection run. A malformed capture that somehow
+  # fires on every window should not be able to fill the queue; the run reports
+  # that it was truncated rather than silently writing a hundred thousand rows.
+  max_alerts_per_run: 5000

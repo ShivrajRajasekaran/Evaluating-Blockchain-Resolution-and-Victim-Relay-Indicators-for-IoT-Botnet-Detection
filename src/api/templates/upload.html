@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block title %}Upload · {{ product_name }}{% endblock %}
+{% block content %}
+<h1>Upload authorised telemetry</h1>
+
+<p class="notice"><strong>Authorised captures only.</strong> This product reads
+  log files you place here or in <code>{{ input_dir }}</code>. It never scans,
+  probes, or connects to any device, and it makes no outbound network calls.
+  Uploaded telemetry is <strong>unlabelled</strong>: it is used to derive
+  features and apply transparent rules, and is never used to train anything.</p>
+
+{% if error %}<p class="flash flash-error" role="alert">{{ error }}</p>{% endif %}
+
+{% if outcome %}
+  {% if outcome.status == 'succeeded' %}
+  <section class="card">
+    <h2>Ingest complete</h2>
+    <p><strong>{{ outcome.windows }}</strong> device-window{{ '' if outcome.windows == 1 else 's' }}
+       from <strong>{{ outcome.devices }}</strong> device{{ '' if outcome.devices == 1 else 's' }}
+       in <code>{{ outcome.source_file }}</code>.</p>
+    <p><strong>{{ outcome.alerts_created }}</strong> new alert{{ '' if outcome.alerts_created == 1 else 's' }},
+       <strong>{{ outcome.alerts_coalesced }}</strong> coalesced into existing ones.
+       {% if outcome.truncated %}<span class="pill warn">run truncated at the configured cap</span>{% endif %}</p>
+    {% if outcome.detection_summary %}
+    <table class="grid">
+      <caption class="sr-only">Verdicts by category</caption>
+      <thead><tr><th scope="col">Verdict</th><th scope="col">Windows</th></tr></thead>
+      <tbody>
+      {% for cat, n in outcome.detection_summary.by_category.items() %}
+        {% if n %}<tr><td>{{ labels.get(cat, cat) }} <code class="small">{{ cat }}</code></td><td class="num">{{ n }}</td></tr>{% endif %}
+      {% endfor %}
+      </tbody>
+    </table>
+    <p class="muted small">A window counted as <code>INSUFFICIENT_TELEMETRY</code>
+      is one this source could not judge on at least one indicator group. It is
+      deliberately not counted as benign and does not raise an alert.</p>
+    {% endif %}
+    <p><a class="btn" href="/alerts">View alerts</a>
+       <a class="btn" href="/ingestion">Ingestion history</a></p>
+  </section>
+  {% else %}
+  <p class="flash flash-error" role="alert">Ingest failed: {{ outcome.error }}</p>
+  {% endif %}
+{% endif %}
+
+<form method="post" action="/upload" enctype="multipart/form-data" class="stack card">
+  <input type="hidden" name="{{ CSRF_FIELD }}" value="{{ csrf_token(request) }}">
+  <label for="file">Log file</label>
+  <input id="file" name="file" type="file" required
+         accept="{{ allowed | join(',') }}">
+  <p class="muted small">Accepted: {{ allowed | join(', ') }} · up to
+     {{ (max_bytes / 1048576) | round | int }} MiB. The filename is recorded for
+     display only; the file is stored under a generated name.</p>
+
+  <label for="source">Telemetry format</label>
+  <select id="source" name="source" required>
+    {% for s in sources %}<option value="{{ s }}">{{ s }}</option>{% endfor %}
+  </select>
+
+  <label for="scenario_id">Scenario id (optional)</label>
+  <input id="scenario_id" name="scenario_id" placeholder="derived from the filename if blank">
+
+  <button type="submit" class="primary">Upload and analyse</button>
+</form>
+
+<section>
+  <h2>What each format can be judged on</h2>
+  <table class="grid">
+    <thead><tr><th scope="col">Format</th><th scope="col">Judgeable groups</th>
+               <th scope="col">Blind groups</th><th scope="col">Approximated</th></tr></thead>
+    <tbody>
+    {% for source, cov in coverage.items() %}
+      <tr>
+        <td class="mono">{{ source }}</td>
+        <td>{% for g in cov.judgeable_groups %}<span class="pill ok">{{ g }}</span>{% endfor %}</td>
+        <td>{% for g in cov.blind_groups %}<span class="pill warn">{{ g }}</span>{% else %}<span class="muted">—</span>{% endfor %}</td>
+        <td class="small mono">{{ cov.proxy_features | join(', ') or '—' }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endblock %}

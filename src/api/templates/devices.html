@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Devices · {{ product_name }}{% endblock %}
+{% block content %}
+<h1>Devices</h1>
+{% if pseudonymised %}
+<p class="notice">Device identifiers are stored as salted pseudonyms. The raw
+  address is never written to this database, so it cannot be recovered from a
+  backup of it.</p>
+{% endif %}
+{% if devices %}
+<table class="grid">
+  <thead><tr><th scope="col">Device</th><th scope="col">Pseudonymised</th>
+             <th scope="col">Alerts</th><th scope="col">First seen</th><th scope="col">Last seen</th></tr></thead>
+  <tbody>
+  {% for d in devices %}
+    <tr>
+      <td class="mono small">{{ d.device_key }}</td>
+      <td>{{ 'yes' if d.is_pseudonymised else 'no' }}</td>
+      <td class="num">{% if d.alert_count %}<a href="/alerts?q={{ d.device_key }}">{{ d.alert_count }}</a>{% else %}0{% endif %}</td>
+      <td class="small mono">{{ d.first_seen or '—' }}</td>
+      <td class="small mono">{{ d.last_seen or '—' }}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% else %}<p class="muted">No devices seen yet.</p>{% endif %}
+{% endblock %}

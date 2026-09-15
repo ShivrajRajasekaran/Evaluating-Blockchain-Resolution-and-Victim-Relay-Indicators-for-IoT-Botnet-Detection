@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}Reports · {{ product_name }}{% endblock %}
+{% block content %}
+<h1>Reports and export</h1>
+
+<section class="tiles">
+  <div class="tile"><span class="tile-n">{{ summary.alerts_total }}</span>
+    <span class="tile-l">Alerts</span></div>
+  <div class="tile"><span class="tile-n">{{ summary.alerts_active }}</span>
+    <span class="tile-l">Awaiting review</span></div>
+  <div class="tile"><span class="tile-n">{{ summary.devices }}</span>
+    <span class="tile-l">Devices</span></div>
+</section>
+
+<section>
+  <h2>Alerts by pattern</h2>
+  {% if summary.alerts_by_category %}
+  <table class="grid">
+    <thead><tr><th scope="col">Pattern</th><th scope="col">Stored constant</th>
+               <th scope="col">Alerts</th></tr></thead>
+    <tbody>
+    {% for cat, n in summary.alerts_by_category.items() %}
+      <tr><td>{{ labels.get(cat, cat) }}</td>
+          <td class="mono small">{{ cat }}</td>
+          <td class="num">{{ n }}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="muted">No alerts recorded.</p>
+  {% endif %}
+</section>
+
+<section>
+  <h2>Alerts by status</h2>
+  {% if summary.alerts_by_status %}
+  <table class="grid compact">
+    <tbody>
+    {% for s, n in summary.alerts_by_status.items() %}
+      <tr><td>{{ s }}</td><td class="num">{{ n }}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="muted">Nothing to summarise yet.</p>
+  {% endif %}
+</section>
+
+<section>
+  <h2>Export</h2>
+  <p class="muted">Both formats carry the review banner and the provenance note,
+    so an exported file cannot be separated from what it means and mistaken for
+    a list of confirmed incidents.</p>
+  <p>
+    <a class="btn" href="/reports/export?fmt=csv">Download CSV</a>
+    <a class="btn" href="/reports/export?fmt=json">Download JSON</a>
+  </p>
+</section>
+
+<section>
+  <h2>Provenance</h2>
+  <p class="small">{{ provenance_note }}</p>
+  <p class="small"><strong>{{ marker }}</strong></p>
+</section>
+{% endblock %}

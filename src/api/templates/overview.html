@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% block title %}Overview · {{ product_name }}{% endblock %}
+{% block content %}
+<h1>Overview</h1>
+
+<section class="tiles">
+  <div class="tile">
+    <span class="tile-n">{{ summary.alerts_active }}</span>
+    <span class="tile-l">Awaiting review</span>
+  </div>
+  <div class="tile">
+    <span class="tile-n">{{ summary.alerts_total }}</span>
+    <span class="tile-l">Alerts total</span>
+  </div>
+  <div class="tile">
+    <span class="tile-n">{{ summary.devices }}</span>
+    <span class="tile-l">Devices seen</span>
+  </div>
+  <div class="tile">
+    <span class="tile-n mono">{{ summary.mode }}</span>
+    <span class="tile-l">Detection mode</span>
+  </div>
+</section>
+
+<section>
+  <h2>What this deployment can and cannot judge</h2>
+  <p class="muted">Detection is only as good as the telemetry behind it. A group
+    no rule can be evaluated on yields <code>INSUFFICIENT_TELEMETRY</code>, never
+    a benign verdict — a quiet window on a source that cannot see the behaviour
+    is not evidence that the behaviour is absent.</p>
+  <table class="grid">
+    <caption class="sr-only">Indicator coverage by telemetry source</caption>
+    <thead>
+      <tr><th scope="col">Source</th><th scope="col">Can judge</th><th scope="col">Blind to</th></tr>
+    </thead>
+    <tbody>
+    {% for source, cov in coverage.items() %}
+      <tr>
+        <td class="mono">{{ source }}</td>
+        <td>{% for g in cov.judgeable_groups %}<span class="pill ok">{{ g }}</span>{% endfor %}</td>
+        <td>{% for g in cov.blind_groups %}<span class="pill warn">{{ g }}</span>{% else %}<span class="muted">—</span>{% endfor %}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</section>
+
+<section>
+  <h2>Most recent alerts</h2>
+  {% if recent %}
+  <table class="grid">
+    <thead>
+      <tr><th scope="col">Severity</th><th scope="col">Pattern</th><th scope="col">Device</th>
+          <th scope="col">Status</th><th scope="col">Seen</th><th scope="col">Last</th></tr>
+    </thead>
+    <tbody>
+    {% for a in recent %}
+      <tr>
+        <td><span class="sev sev-{{ a.severity|lower }}">{{ a.severity }}</span></td>
+        <td><a href="/alerts/{{ a.id }}">{{ a.category_label }}</a></td>
+        <td class="mono small">{{ a.device_key }}</td>
+        <td>{{ a.status }}</td>
+        <td class="num">{{ a.occurrence_count }}</td>
+        <td class="small mono">{{ a.last_seen }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="muted">No alerts yet. Upload an authorised capture to begin.</p>
+  {% endif %}
+</section>
+
+<section>
+  <h2>Recent ingestion</h2>
+  {% if summary.jobs %}
+  <table class="grid">
+    <thead><tr><th scope="col">Job</th><th scope="col">Source</th><th scope="col">Status</th>
+               <th scope="col">Windows</th><th scope="col">Created</th></tr></thead>
+    <tbody>
+    {% for j in summary.jobs %}
+      <tr>
+        <td class="num">{{ j.id }}</td>
+        <td class="mono">{{ j.source_dataset }}</td>
+        <td><span class="pill {{ 'ok' if j.status == 'succeeded' else 'warn' }}">{{ j.status }}</span></td>
+        <td class="num">{{ j.windows_emitted if j.windows_emitted is not none else '—' }}</td>
+        <td class="small mono">{{ j.created_at }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="muted">Nothing ingested yet.</p>
+  {% endif %}
+</section>
+{% endblock %}

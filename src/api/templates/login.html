@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sign in · {{ product_name }}</title>
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body class="centered">
+<main class="card login">
+  <h1>{{ product_name }}</h1>
+  <p class="banner" role="note">{{ banner }}</p>
+  {% if error %}<p class="flash flash-error" role="alert">{{ error }}</p>{% endif %}
+  <form method="post" action="/login">
+    {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
+    <label for="username">Username</label>
+    <input id="username" name="username" autocomplete="username" required
+           value="{{ username }}" autofocus>
+    <label for="password">Password</label>
+    <input id="password" name="password" type="password"
+           autocomplete="current-password" required>
+    <button type="submit" class="primary">Sign in</button>
+  </form>
+  <p class="muted small">Accounts are created locally by an administrator with
+    <code>scripts/create_user.py</code>. There is no self-registration and no
+    password reset by email — this product makes no outbound connections.</p>
+</main>
+</body>
+</html>

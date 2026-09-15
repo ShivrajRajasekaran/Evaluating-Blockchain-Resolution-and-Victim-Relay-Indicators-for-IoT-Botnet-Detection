@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block title %}Alerts · {{ product_name }}{% endblock %}
+{% block content %}
+<h1>Alerts</h1>
+<p class="muted">Every row is a suspicious indicator pattern requiring review.
+  Windows that fired nothing, and windows the telemetry could not judge, are not
+  listed here — see <a href="/reports">Reports</a> for those counts.</p>
+
+<form class="filters" method="get" action="/alerts" data-autosubmit>
+  <label for="f-q">Search</label>
+  <input id="f-q" name="q" value="{{ filters.q or '' }}" placeholder="explanation, uid or file">
+  <label for="f-cat">Pattern</label>
+  <select id="f-cat" name="category">
+    <option value="">Any</option>
+    {% for c in categories %}
+      <option value="{{ c }}" {% if filters.category == c %}selected{% endif %}>{{ labels.get(c, c) }}</option>
+    {% endfor %}
+  </select>
+  <label for="f-status">Status</label>
+  <select id="f-status" name="status">
+    <option value="">Any</option>
+    {% for s in statuses %}
+      <option value="{{ s }}" {% if filters.status == s %}selected{% endif %}>{{ s }}</option>
+    {% endfor %}
+  </select>
+  <button type="submit" class="primary">Filter</button>
+  <a class="btn" href="/alerts">Clear</a>
+</form>
+
+<p class="muted small">{{ page.total }} alert{{ '' if page.total == 1 else 's' }} matched.</p>
+
+{% if page.items %}
+<table class="grid">
+  <thead>
+    <tr>
+      <th scope="col">Severity</th><th scope="col">Pattern</th><th scope="col">Device</th>
+      <th scope="col">Confidence</th><th scope="col">Windows</th>
+      <th scope="col">Status</th><th scope="col">Last seen</th><th scope="col">Source</th>
+    </tr>
+  </thead>
+  <tbody>
+  {% for a in page.items %}
+    <tr>
+      <td><span class="sev sev-{{ a.severity|lower }}">{{ a.severity }}</span></td>
+      <td>
+        <a href="/alerts/{{ a.id }}">{{ a.category_label }}</a>
+        {% if a.coverage_note %}<span class="pill warn" title="{{ a.coverage_note }}">partial telemetry</span>{% endif %}
+      </td>
+      <td class="mono small">{{ a.device_key }}</td>
+      <td>{{ a.confidence }}</td>
+      <td class="num">{{ a.occurrence_count }}</td>
+      <td>{{ a.status }}</td>
+      <td class="small mono">{{ a.last_seen }}</td>
+      <td class="small">{{ a.source_file or '—' }}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+
+{% if page.pages > 1 %}
+<nav class="pager" aria-label="Pagination">
+  {% set qs = 'status=' ~ (filters.status or '') ~ '&category=' ~ (filters.category or '') ~ '&q=' ~ (filters.q or '') %}
+  {% if page.has_prev %}<a class="btn" href="/alerts?{{ qs }}&page={{ page.page - 1 }}">Previous</a>{% endif %}
+  <span class="muted">Page {{ page.page }} of {{ page.pages }}</span>
+  {% if page.has_next %}<a class="btn" href="/alerts?{{ qs }}&page={{ page.page + 1 }}">Next</a>{% endif %}
+</nav>
+{% endif %}
+{% else %}
+<p class="muted">No alerts match these filters.</p>
+{% endif %}
+{% endblock %}

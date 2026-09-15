@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}Audit · {{ product_name }}{% endblock %}
+{% block content %}
+<h1>Audit trail</h1>
+<p class="notice">Append-only by construction. The repository exposes no update
+  or delete method for these rows, so history cannot be rewritten through this
+  product.</p>
+<p class="muted small">{{ page.total }} event{{ '' if page.total == 1 else 's' }} recorded.</p>
+{% if page.items %}
+<table class="grid">
+  <thead><tr><th scope="col">When</th><th scope="col">Action</th><th scope="col">Actor</th>
+             <th scope="col">Target</th><th scope="col">Request</th></tr></thead>
+  <tbody>
+  {% for e in page.items %}
+    <tr>
+      <td class="small mono">{{ e.created_at }}</td>
+      <td class="mono">{{ e.action }}</td>
+      <td>{{ e.actor or '—' }}</td>
+      <td class="small mono">{{ e.target_type or '—' }}{% if e.target_id %}/{{ e.target_id }}{% endif %}</td>
+      <td class="small mono">{{ e.request_id or '—' }}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% if page.pages > 1 %}
+<nav class="pager" aria-label="Pagination">
+  {% if page.has_prev %}<a class="btn" href="/audit?page={{ page.page - 1 }}">Previous</a>{% endif %}
+  <span class="muted">Page {{ page.page }} of {{ page.pages }}</span>
+  {% if page.has_next %}<a class="btn" href="/audit?page={{ page.page + 1 }}">Next</a>{% endif %}
+</nav>
+{% endif %}
+{% else %}<p class="muted">No audit events yet.</p>{% endif %}
+{% endblock %}

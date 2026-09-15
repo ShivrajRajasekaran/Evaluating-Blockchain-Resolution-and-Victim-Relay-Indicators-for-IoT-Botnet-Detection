@@ -1,0 +1,43 @@
+# .gitignore
+#
+# The load-bearing entries are .env (the session signing key: anyone holding it
+# can forge a cookie for any user) and data/ (real network telemetry about real
+# devices, plus the alerts database). Neither belongs in version control.
+
+.env
+.env.*
+!.env.example
+
+data/
+*.db
+*.sqlite
+*.sqlite3
+*.db-journal
+*.db-wal
+*.db-shm
+
+.venv/
+venv/
+env/
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+
+.coverage
+htmlcov/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Generated research artefacts — reproducible from scripts/run_pipeline.py.
+results/tables/*.csv
+results/figures/*.png
+results/reports/*.json
+results/models/*.joblib

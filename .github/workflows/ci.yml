@@ -1,0 +1,112 @@
+# .github/workflows/ci.yml — continuous integration.
+#
+# WRITTEN, NOT RUN. This repository has no GitHub remote in this build; the
+# workflow is here so CI is a reviewed artefact rather than something assembled
+# in a hurry the day it is needed.
+#
+# WHAT IT ENFORCES, beyond "the tests pass"
+#   * The containment guarantee, as its own reported step. If a future change
+#     introduces an outbound HTTP client or a CDN reference, that shows up as a
+#     named failing check rather than one line inside a 700-test run.
+#   * No forbidden dependency, checked against the INSTALLED set. A test can be
+#     deleted; this reads what pip actually resolved, including transitively.
+#   * pandas stays below 3.0, which src/features/windowing.py depends on.
+
+name: CI
+
+on:
+  push:
+    branches: ["main", "master"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read          # least privilege: CI only needs to read the code
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Verify no outbound HTTP client was installed
+        # The product must not be CAPABLE of making outbound requests. A
+        # transitive dependency pulling in httpx or requests would defeat the
+        # source-level guard without touching a single line of our code.
+        run: |
+          set -e
+          installed=$(pip list --format=freeze | cut -d= -f1 | tr 'A-Z' 'a-z')
+          for pkg in requests httpx httpx2 aiohttp urllib3 pycurl websockets \
+                     paramiko scapy boto3 dnspython; do
+            if echo "$installed" | grep -qx "$pkg"; then
+              echo "::error::$pkg is installed; this product must not be able"\
+                   "to make outbound network connections"
+              exit 1
+            fi
+          done
+          echo "no outbound HTTP client present"
+
+      - name: Verify pandas is below 3.0
+        run: |
+          python - <<'PY'
+          import sys
+          from importlib.metadata import version
+          major = int(version("pandas").split(".")[0])
+          if major >= 3:
+              sys.exit("pandas 3.x changes timestamp flooring that "
+                       "src/features/windowing.py depends on; pin <3")
+          print("pandas", version("pandas"))
+          PY
+
+      - name: Run the full test suite
+        env:
+          PRODUCT_SESSION_SECRET: ci-only-signing-secret-not-a-real-one
+        run: python -m unittest discover -s tests -t . -v
+
+      - name: Containment guarantee
+        # Re-run on its own so a breach is a named check, not a buried line.
+        env:
+          PRODUCT_SESSION_SECRET: ci-only-signing-secret-not-a-real-one
+        run: python -m unittest tests.test_containment_outbound -v
+
+      - name: Operator scripts are runnable
+        env:
+          PRODUCT_SESSION_SECRET: ci-only-signing-secret-not-a-real-one
+        run: |
+          set -e
+          python -m scripts.init_db --db /tmp/ci.db
+          python -m scripts.init_db --db /tmp/ci.db --check
+          echo "ci-password-long-enough" | python -m scripts.create_user \
+            --db /tmp/ci.db --username ci --role Admin --password-stdin
+          python -m scripts.create_user --db /tmp/ci.db --list
+
+  lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Advisory: style should not block a security fix from merging.
+    continue-on-error: true
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install ruff
+      - run: ruff check src scripts tests

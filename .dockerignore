@@ -1,0 +1,34 @@
+# .dockerignore — keep secrets, data and local state OUT of the image.
+#
+# The first three entries are the important ones: a .env or a populated data/
+# baked into an image is a credential and a corpus of customer network metadata
+# that travels wherever the image goes.
+
+.env
+.env.*
+!.env.example
+data/
+*.db
+*.sqlite
+*.sqlite3
+
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+htmlcov/
+
+.git/
+.github/
+.gitignore
+.idea/
+.vscode/
+
+results/
+notebooks/
+docs/
+tests/
+*.md
+!README.md

@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+{% block title %}Detection · {{ product_name }}{% endblock %}
+{% block content %}
+<h1>Detection configuration</h1>
+
+<p class="notice"><strong>Mode: {{ detection.mode }}.</strong> {{ marker }}
+  {% if detection.gate.notice %}<br>{{ detection.gate.notice }}{% endif %}</p>
+
+{% if not detection.gate.allowed and detection.gate.reasons %}
+<section class="card">
+  <h2>Why ML mode is not active</h2>
+  <ul>{% for r in detection.gate.reasons %}<li>{{ r }}</li>{% endfor %}</ul>
+  <p class="muted small">Model scoring stays refused until an authorised
+    labelled dataset exists and a model is registered with recorded training
+    provenance, validation metrics, a calibrated threshold and a matching
+    feature schema. A model whose training provenance is synthetic is refused
+    permanently.</p>
+</section>
+{% endif %}
+
+<section>
+  <h2>Rules in force</h2>
+  <p class="muted small">Version <code>{{ detection.detection_version }}</code>,
+    fingerprint <code>{{ detection.ruleset_digest }}</code>. These are the same
+    thresholds the research baseline votes on — the product does not restate
+    them, it reads them, and refuses to run if the two ever disagree.</p>
+  <table class="grid">
+    <thead><tr><th scope="col">Feature</th><th scope="col">Group</th>
+               <th scope="col">Condition</th><th scope="col">Reads as</th>
+               <th scope="col">Category</th></tr></thead>
+    <tbody>
+    {% for r in detection.rules %}
+      <tr>
+        <td class="mono small">{{ r.feature }}</td>
+        <td>{{ r.group }}</td>
+        <td class="mono small">{{ r.op }} {{ r.threshold }}</td>
+        <td class="small">{{ r.reason }}</td>
+        <td class="small">{{ labels.get(r.category, r.category) }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</section>
+
+<section class="cols">
+  <div>
+    <h2>Severity</h2>
+    <table class="grid compact">
+      <thead><tr><th scope="col">Votes at least</th><th scope="col">Groups at least</th>
+                 <th scope="col">Severity</th></tr></thead>
+      <tbody>
+      {% for r in detection.severity.rules %}
+        <tr><td class="num">{{ r.min_votes }}</td><td class="num">{{ r.min_groups }}</td>
+            <td>{{ r.severity }}</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    <p class="muted small">Default {{ detection.severity.default }}.
+      Combined resolution and relay patterns are floored at
+      {{ detection.severity.combined_floor }}, so the project's signal of
+      interest is never buried under a single-vote LOW.</p>
+  </div>
+  <div>
+    <h2>Confidence bands</h2>
+    <p>Fired rules divided by rules that could be evaluated <em>in that
+       window</em>:</p>
+    <ul>
+      <li>below {{ detection.confidence_bands.medium_at }} gives low</li>
+      <li>{{ detection.confidence_bands.medium_at }} to
+          {{ detection.confidence_bands.high_at }} gives medium</li>
+      <li>{{ detection.confidence_bands.high_at }} and above gives high</li>
+    </ul>
+    <p class="muted small">The denominator is what the window could actually
+      measure, not a fixed seven. Dividing by seven on a conn.log would cap
+      every possible confidence at three sevenths and report "low" for total
+      agreement among everything the telemetry could say.</p>
+  </div>
+</section>
+
+<section>
+  <h2>Coverage by source</h2>
+  {% for source, cov in detection.sources.items() %}
+  <h3 class="grouph">{{ source }}</h3>
+  <table class="grid compact">
+    <thead><tr><th scope="col">Group</th><th scope="col">Features present</th>
+               <th scope="col">Rules evaluable</th><th scope="col">Judgeable</th></tr></thead>
+    <tbody>
+    {% for g, d in cov.groups.items() %}
+      <tr>
+        <td>{{ g }}</td>
+        <td class="num">{{ d.n_features_present }}/{{ d.n_features }}</td>
+        <td class="num">{{ d.n_rules_evaluable }}/{{ d.n_rules }}</td>
+        <td>{% if d.judgeable %}<span class="pill ok">yes</span>
+            {% else %}<span class="pill warn">no</span>{% endif %}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% endfor %}
+</section>
+
+<section>
+  <h2>Model registry</h2>
+  {% if models %}
+  <table class="grid">
+    <thead><tr><th scope="col">Name</th><th scope="col">Version</th>
+               <th scope="col">Kind</th><th scope="col">Validated</th>
+               <th scope="col">Registered</th></tr></thead>
+    <tbody>
+    {% for m in models %}
+      <tr>
+        <td>{{ m.name }}</td><td class="mono small">{{ m.version }}</td>
+        <td>{{ m.kind }}</td>
+        <td>{% if m.is_validated %}<span class="pill ok">yes</span>
+            {% else %}<span class="pill">no</span>{% endif %}</td>
+        <td class="small mono">{{ m.registered_at }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="muted">No models registered. Detection is rule-based.</p>
+  {% endif %}
+</section>
+{% endblock %}

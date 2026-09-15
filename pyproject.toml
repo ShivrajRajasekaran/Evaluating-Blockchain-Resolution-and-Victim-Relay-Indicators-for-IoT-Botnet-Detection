@@ -1,0 +1,113 @@
+# pyproject.toml — project metadata and tool configuration.
+#
+# The package is not published anywhere. This file exists so the project is
+# installable locally (`pip install -e .`), so the console entry points are
+# discoverable, and so linters read one configuration instead of four.
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "authorised-log-analytics"
+version = "1.0.0"
+description = """\
+Local-first defensive detection over authorised network telemetry. Derives \
+device-window features, applies transparent rules, and raises explainable, \
+auditable review alerts. It never confirms compromise and never trains on the \
+data it ingests."""
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "Proprietary — internal use only" }
+keywords = ["network-security", "detection", "iot", "defensive-security"]
+
+classifiers = [
+  "Private :: Do Not Upload",
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: System Administrators",
+  "Programming Language :: Python :: 3.11",
+  "Topic :: Security",
+]
+
+# Mirrors requirements.txt. No HTTP client, no ORM, no auth framework — see the
+# annotated reasoning there.
+dependencies = [
+  "starlette==1.6.0",
+  "uvicorn==0.52.4",
+  "jinja2==3.1.6",
+  "itsdangerous==2.2.0",
+  "python-multipart==0.0.32",
+  "pyyaml==6.0.3",
+  "numpy==2.4.6",
+  "pandas>=2.2,<3",
+  "scikit-learn==1.9.1",
+  "matplotlib==3.11.1",
+]
+
+[project.optional-dependencies]
+# NOT installed in this build. Each needs explicit approval, and each is gated
+# off in code rather than merely unused — see docs/deployment-guide.md.
+postgres = ["psycopg2-binary>=2.9"]   # storage.postgres.enabled is false
+pdf = ["reportlab>=4.0"]              # reports export CSV / JSON / print HTML
+
+[project.scripts]
+als-init-db = "scripts.init_db:main"
+als-create-user = "scripts.create_user:main"
+als-ingest = "scripts.ingest_file:main"
+als-server = "scripts.run_server:main"
+
+[tool.setuptools]
+packages = ["src", "scripts"]
+include-package-data = true
+
+[tool.setuptools.package-data]
+src = ["api/templates/*.html", "api/static/*", "storage/migrations/*.sql"]
+
+# ---------------------------------------------------------------------------
+# Tests
+# ---------------------------------------------------------------------------
+# The suite is stdlib unittest and is run with:
+#     python -m unittest discover -s tests -t .
+# pytest is not a dependency; this section only helps if a developer has it
+# installed globally and prefers it.
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+
+[tool.coverage.run]
+branch = true
+source = ["src"]
+omit = ["src/reports/figures.py"]
+
+[tool.coverage.report]
+exclude_lines = [
+  "pragma: no cover",
+  "if __name__ == .__main__.:",
+  "raise NotImplementedError",
+]
+
+# ---------------------------------------------------------------------------
+# Linting
+# ---------------------------------------------------------------------------
+[tool.ruff]
+line-length = 88
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "S", "C4", "UP"]
+ignore = [
+  "S101",    # assert: used intentionally in the test suite
+  "E501",    # long lines are caught by line-length, not duplicated here
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S105", "S106"]   # hard-coded test credentials are the point
+
+# `S310` flags urllib.request; it should never be suppressed anywhere in this
+# project. tests/test_containment_outbound.py enforces the same rule far more
+# strictly, by AST, across the whole product tree.
+
+[tool.isort]
+profile = "black"
+line_length = 88
+known_first_party = ["src", "scripts", "tests"]
