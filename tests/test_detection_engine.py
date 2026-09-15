@@ -516,6 +516,35 @@ class Evidence(unittest.TestCase):
         self.assertTrue(self.v.explanation_with_marker.endswith(
             "Rule-based detection; not ML-validated."))
 
+    def test_a_capped_value_discloses_that_it_was_censored(self):
+        """A value on the schema ceiling is a censored measurement.
+
+        `updownlink_ratio`'s rule reads a value near 1.0 as relay-like byte
+        SYMMETRY, but the cap (5.0) is reached by a window with uplink and
+        almost no downlink — the opposite shape — and both clear `> 0.7`. The
+        threshold is the published baseline and is not changed to paper over
+        that, so the alert has to say the reading may not apply.
+        """
+        v = E.detect(H.mock_frame(1, **QUIET,
+                                  updownlink_ratio=5.0)).verdicts[0]
+        hit = next(h for h in v.hits if h.feature == "updownlink_ratio")
+        self.assertTrue(hit.at_cap)
+        self.assertIn("CAPPED", v.explanation)
+        self.assertIn("may not apply", v.explanation)
+
+    def test_an_uncapped_value_carries_no_caveat(self):
+        v = E.detect(H.mock_frame(1, **QUIET,
+                                  updownlink_ratio=0.9)).verdicts[0]
+        hit = next(h for h in v.hits if h.feature == "updownlink_ratio")
+        self.assertFalse(hit.at_cap)
+        self.assertNotIn("CAPPED", v.explanation)
+
+    def test_an_unbounded_feature_is_never_treated_as_capped(self):
+        # ens_query_rate has no upper bound, so no value of it is censored.
+        v = E.detect(H.mock_frame(1, **QUIET,
+                                  ens_query_rate=9.0)).verdicts[0]
+        self.assertFalse(v.hits[0].at_cap)
+
     def test_the_coverage_note_is_a_field_not_an_inlined_sentence(self):
         """It travels separately so no page states it three times.
 
@@ -656,13 +685,34 @@ class AgreementWithTheResearchBaseline(unittest.TestCase):
         self.assertEqual([v.votes for v in result.verdicts], list(expected))
 
     def test_thresholds_are_never_redeclared_in_the_engine(self):
-        # Structural, not stylistic: a threshold literal anywhere in the engine
-        # is a second place the baseline could drift from, so there are none.
-        source = Path(E.__file__).read_text(encoding="utf-8")
+        """No threshold literal appears in the engine's executable code.
+
+        Structural, not stylistic: a second copy of a threshold is a second
+        place the baseline could drift from.
+
+        Scanned by AST rather than by text search. A plain substring check also
+        matches PROSE — the docstring explaining the updownlink_ratio cap has to
+        say "a value near 1.0", and "1.0" is serverlist_pull's threshold. The
+        engine must be free to describe the rules it applies; it must not
+        restate their numbers in code.
+        """
+        import ast
+
+        tree = ast.parse(Path(E.__file__).read_text(encoding="utf-8"))
+        # FLOAT literals only. Every threshold in the rule table is written as a
+        # float; the integers in this module are counter increments and slice
+        # indices, and coercing those to float makes `+ 1` collide with
+        # serverlist_pull's threshold of 1.0. Behavioural drift is caught
+        # separately and more strongly at runtime, by the engine's own check
+        # against HeuristicDetector.votes on every frame.
+        literals = {n.value for n in ast.walk(tree)
+                    if isinstance(n, ast.Constant)
+                    and isinstance(n.value, float)}
         for feat, _op, thr, _reason in RULES:
-            self.assertNotIn(f"{thr}", source,
-                             f"the engine restates {feat}'s threshold; it must "
-                             "read it from models.heuristic.RULES")
+            self.assertNotIn(
+                float(thr), literals,
+                f"the engine's code contains {feat}'s threshold {thr}; it must "
+                "read it from models.heuristic.RULES")
 
     def test_ruleset_digest_is_stable_and_short(self):
         self.assertEqual(E.ruleset_digest(), E.ruleset_digest())

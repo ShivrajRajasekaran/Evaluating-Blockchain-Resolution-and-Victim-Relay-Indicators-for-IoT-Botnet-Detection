@@ -98,15 +98,21 @@ class RuleHit:
     threshold: float
     value: float
     reason: str
+    at_cap: bool = False
 
     def as_dict(self) -> dict:
         return {"feature": self.feature, "group": self.group, "op": self.op,
                 "threshold": self.threshold, "value": self.value,
-                "reason": self.reason}
+                "reason": self.reason, "at_cap": self.at_cap}
 
     def __str__(self) -> str:
-        return (f"{self.reason} ({self.feature} = {self.value:g} "
+        text = (f"{self.reason} ({self.feature} = {self.value:g} "
                 f"{self.op} {self.threshold:g})")
+        if self.at_cap:
+            text += (f" [{self.feature} was CAPPED at the schema maximum "
+                     f"{self.value:g}; the measured value was higher, so the "
+                     "rule's stated reading may not apply]")
+        return text
 
 
 @dataclass(frozen=True)
@@ -377,7 +383,8 @@ class DetectionEngine:
         hits = tuple(
             RuleHit(feature=feat, group=K.GROUP_OF_FEATURE[feat], op=op,
                     threshold=float(thr), value=float(feats.at[i, feat]),
-                    reason=reason)
+                    reason=reason,
+                    at_cap=_at_cap(feat, float(feats.at[i, feat])))
             for feat, op, thr, reason in RULES if fired[feat][i])
         fired_groups = tuple(
             g for g in K.FEATURE_GROUPS if any(h.group == g for h in hits))
@@ -477,6 +484,34 @@ def detect(obs: pd.DataFrame, *, cfg=None, repo=None,
            mode: str | None = None) -> DetectionResult:
     """Convenience wrapper: build an engine and run one frame through it."""
     return DetectionEngine(cfg=cfg, repo=repo, mode=mode).detect_frame(obs)
+
+
+def _at_cap(feature: str, value: float) -> bool:
+    """Whether this value is sitting on the feature's schema maximum.
+
+    A capped value is a censored measurement, not a measurement: the real
+    number was higher and the ceiling is all that survived. That matters most
+    for ``updownlink_ratio``, whose rule reads a value near 1.0 as relay-like
+    byte SYMMETRY — while the cap (5.0) is reached by a window with uplink and
+    almost no downlink, which is the opposite shape. Both clear the rule's
+    ``> 0.7`` threshold and fire identically.
+
+    The engine does not change the threshold to fix that: these rules are the
+    published baseline, carried over verbatim so the product and the research
+    numbers stay comparable, and the engine verifies its own votes against that
+    baseline on every frame. So the censoring is DISCLOSED on the alert instead,
+    in the same spirit as the coverage note — an analyst is told the reading is
+    unreliable rather than shown a tidier number that is not true.
+
+    See src/features/derive.py (_updownlink_ratio) and docs/limitations.md.
+    """
+    bounds = K.FEATURE_RANGES.get(feature)
+    if not bounds:
+        return False
+    _low, high = bounds
+    if high is None:
+        return False
+    return value >= float(high)
 
 
 def _cell(df: pd.DataFrame, col: str, i: int) -> str:
