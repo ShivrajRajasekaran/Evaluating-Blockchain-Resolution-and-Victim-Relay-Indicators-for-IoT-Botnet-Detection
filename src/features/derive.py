@@ -409,11 +409,13 @@ def _mean_pkt_size(windowed: pd.DataFrame, keys: pd.MultiIndex) -> np.ndarray:
 # features are derived from them. They are unlabelled — every row is unmapped —
 # but feature derivation is label-agnostic, and each carries a FEATURE_AVAILABILITY
 # entry whose computable+proxy union is exactly these eleven.
-FLOW_DERIVED_SOURCES: tuple[str, ...] = (K.SOURCE_IOT23,) + K.OPERATIONAL_SOURCES
+FLOW_DERIVED_SOURCES: tuple[str, ...] = (
+    (K.SOURCE_IOT23, K.SOURCE_ZEEK_BUNDLE) + K.OPERATIONAL_SOURCES)
 
 
 def derive_features(windowed: pd.DataFrame, *, source: str,
-                    params: DeriveParams | None = None) -> Derived:
+                    params: DeriveParams | None = None,
+                    applayer: pd.DataFrame | None = None) -> Derived:
     """Compute the feature table for a windowed flow frame.
 
     Only features the schema declares COMPUTABLE or PROXY for ``source`` are
@@ -462,6 +464,20 @@ def derive_features(windowed: pd.DataFrame, *, source: str,
         "beacon_jitter": jitter,
         "mean_pkt_size": _mean_pkt_size(windowed, keys),
     }
+
+    # Features this module cannot compute from a flow table, supplied by the
+    # caller. Only src/features/applayer.py produces them, and only for a source
+    # whose telemetry actually contains dns/http/ssl. They are merged BEFORE the
+    # agreement check so the same check governs both halves: a source that
+    # declares ens_query_rate computable but is handed no applayer frame fails
+    # here rather than silently emitting eleven of sixteen features.
+    if applayer is not None:
+        if len(applayer) != len(index):
+            raise RuntimeError(
+                f"applayer has {len(applayer)} rows but the window index has "
+                f"{len(index)}; refusing to attach features to the wrong windows")
+        for name in applayer.columns:
+            computed[name] = applayer[name].to_numpy(dtype="float64")
 
     # The availability table decides what may be emitted, so a formula added
     # here without updating the table has no effect, and a table entry promoted

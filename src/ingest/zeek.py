@@ -240,6 +240,44 @@ def count_data_lines(path: str | Path) -> int:
     return max(0, total - comments)
 
 
+def split_combined_fields(frame: "pd.DataFrame") -> "pd.DataFrame":
+    """Split IoT-23's space-joined trailing columns into real columns.
+
+    IoT-23's labelling tool appends its two label columns to conn.log using
+    SPACES where Zeek uses tabs, so the header ends with a single tab-delimited
+    field literally named::
+
+        "tunnel_parents   label   detailed-label"
+
+    and each row ends with one field like ``"-   Malicious   FileDownload"``.
+    Tab count still matches field count, so the whitespace fallback in
+    :func:`detect_separator_mode` does not fire and nothing looks wrong — the
+    label columns simply are not there under the names anything asks for.
+
+    This splits any column whose NAME contains internal whitespace into its
+    constituent names, dividing each value on whitespace runs. Rows carrying
+    fewer parts than the header declares are padded with the unset token rather
+    than dropped: a row missing its detailed label is still a labelled row.
+
+    Columns without internal whitespace are returned untouched, so this is safe
+    to call on a well-formed log.
+    """
+    out = frame
+    for col in list(frame.columns):
+        names = str(col).split()
+        if len(names) < 2:
+            continue
+        parts = (frame[col].astype(str)
+                 .str.split(r"\s+", n=len(names) - 1, expand=True))
+        parts = parts.reindex(columns=range(len(names)))
+        parts.columns = names
+        parts = parts.fillna(UNSET)
+        out = out.drop(columns=[col])
+        for name in names:
+            out[name] = parts[name].to_numpy()
+    return out
+
+
 def read_log(path: str | Path, *, usecols: list[str] | None = None,
              max_rows: int | None = None,
              chunksize: int = 1_000_000) -> tuple[pd.DataFrame, ZeekHeader,

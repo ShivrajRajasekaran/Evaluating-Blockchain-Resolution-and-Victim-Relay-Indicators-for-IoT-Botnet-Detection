@@ -32,12 +32,17 @@ from . import columns as K
 _PROVENANCE_OF_SOURCE = {
     K.SOURCE_MOCK_LOCAL: K.PROV_SYNTHETIC,
     K.SOURCE_IOT23: K.PROV_REAL_CAPTURE,
+    # A Zeek bundle is the SAME packets as its IoT-23 scenario, replayed locally
+    # to regenerate logs the dataset does not ship. Real capture, and its labels
+    # are the dataset authors' own, so both fields match SOURCE_IOT23 exactly.
+    K.SOURCE_ZEEK_BUNDLE: K.PROV_REAL_CAPTURE,
     # Operational captures are real wire traffic — just unlabelled.
     **{s: K.PROV_REAL_CAPTURE for s in K.OPERATIONAL_SOURCES},
 }
 _CONFIDENCE_OF_SOURCE = {
     K.SOURCE_MOCK_LOCAL: K.CONF_SYNTHETIC_GROUND_TRUTH,
     K.SOURCE_IOT23: K.CONF_DATASET_ANNOTATED,
+    K.SOURCE_ZEEK_BUNDLE: K.CONF_DATASET_ANNOTATED,
     # No annotator ever inspected operational telemetry: it has no label, and
     # marking it CONF_UNLABELLED is what keeps it out of any training set.
     **{s: K.CONF_UNLABELLED for s in K.OPERATIONAL_SOURCES},

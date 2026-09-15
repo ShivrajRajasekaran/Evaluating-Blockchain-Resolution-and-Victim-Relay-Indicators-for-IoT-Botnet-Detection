@@ -1,14 +1,25 @@
 # .gitignore
 #
-# The load-bearing entries are .env (the session signing key: anyone holding it
-# can forge a cookie for any user) and data/ (real network telemetry about real
-# devices, plus the alerts database). Neither belongs in version control.
+# The load-bearing entries are the first three groups.
+#
+#   .env      the session signing key — anyone holding it can forge a cookie
+#             for any user, including Admin.
+#   data/     real network telemetry about real devices, the alerts database,
+#             the pseudonymisation salt, and password hashes.
+#   references/  and  data/  together are ~23 GB of captures and source
+#             material. GitHub caps a single file at 100 MB and warns well
+#             before a repository reaches a few GB, so these cannot go up even
+#             if they were safe to publish.
 
 .env
 .env.*
 !.env.example
 
+# ---- captures, datasets and the product database --------------------------
 data/
+references/
+*.pcap
+*.pcapng
 *.db
 *.sqlite
 *.sqlite3
@@ -16,6 +27,24 @@ data/
 *.db-wal
 *.db-shm
 
+# Zeek output written at the repository root by scripts/run_zeek.py. These are
+# regenerated from a capture; they are not sources.
+conn.log
+dns.log
+http.log
+ssl.log
+irc.log
+dhcp.log
+ntp.log
+files.log
+ocsp.log
+x509.log
+weird.log
+reporter.log
+packet_filter.log
+*.log.labeled
+
+# ---- environments and build artefacts -------------------------------------
 .venv/
 venv/
 env/
@@ -36,8 +65,15 @@ htmlcov/
 .DS_Store
 Thumbs.db
 
-# Generated research artefacts — reproducible from scripts/run_pipeline.py.
+# ---- generated results -----------------------------------------------------
+# Reproducible from scripts/run_pipeline.py; kept out so the history stays
+# readable and a regenerated figure is not a diff.
 results/tables/*.csv
 results/figures/*.png
 results/reports/*.json
 results/models/*.joblib
+results/walkthrough/
+
+# ---- report working files --------------------------------------------------
+*.docx.template-backup
+~$*.docx

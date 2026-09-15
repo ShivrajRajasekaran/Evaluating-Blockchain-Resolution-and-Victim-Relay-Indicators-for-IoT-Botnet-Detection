@@ -163,6 +163,74 @@ iot23:
   max_flows: null
 
 # ---------------------------------------------------------------------------
+# Blockchain-name resolution: what to look for, and why
+# ---------------------------------------------------------------------------
+# THE CORRECTION THIS ENCODES
+# The obvious design for a "blockchain resolution" feature is to look for .eth /
+# .sol names in dns.log. That design is wrong, and the primary sources say so.
+#
+# NICT's analysis (21 May 2026) states it directly: the malware "doesn't actually
+# connect to Ethereum's Peer to Peer (P2P) network, but rather uses a service that
+# provides an endpoint to mediate it", and "ENS requires POSTing a JSON-RPC format
+# payload to the endpoint". A .eth name is never resolved through DNS, so it never
+# appears in dns.log and no qname pattern can find it.
+#
+# What IS observable is the session to the gateway: an ordinary HTTPS connection
+# whose TLS Server Name Indication is one of a small, enumerable set of commercial
+# RPC providers. That is visible in ssl.log without decrypting anything.
+#
+# SOURCES
+#   Ethereum/Solana endpoint list, verbatim from Table 1 of:
+#     NICTER Analysis Team, NICT (Japan), "Name-resolving malware DDoS attacks on
+#     Ethereum and Solana", 21 May 2026.
+#   Corroborating behaviour (not the endpoint list):
+#     Nokia Deepfield ERT + Comcast CTRL, "Reverse-engineering Jackskid", 24 Mar 2026
+#     CNCERT + Qi'anxin X Lab, "Dysphoria botnet", 24 Jul 2026
+#
+# CAUTION FOR INTERPRETATION
+# These are legitimate commercial services used by ordinary software. A match is a
+# suspicious indicator on an IoT device that has no business reaching them; it is
+# NOT evidence of compromise on a general-purpose host. This is exactly why the
+# Amazon Echo capture is the specificity control.
+#
+# THESE NAMES ARE NEVER RESOLVED OR CONTACTED. They are compared as strings
+# against captured log fields; nothing in this project opens a connection.
+resolution:
+  # Matched against ssl.log `server_name` (TLS SNI), falling back to http.log
+  # `host`. Suffix match, so a subdomain of a listed gateway also counts.
+  rpc_gateways:
+    ethereum:
+      - "eth.llamarpc.com"
+      - "ethereum.publicnode.com"
+      - "ethereum-rpc.publicnode.com"
+      - "eth-mainnet.public.blastapi.io"
+      - "eth.drpc.org"
+      - "rpc.mevblocker.io"
+      - "eth-protect.rpc.blxrbdn.com"
+      - "1rpc.io"
+    solana:
+      - "sdk-proxy.sns.id"
+      - "sns-sdk-proxy.bonfida.workers.dev"
+
+  # Blockchain-name suffixes. Retained as a SECONDARY signal only: NICT reports a
+  # temporary fallback to public DNS when RPC endpoints were unstable, so these
+  # can appear in dns.log occasionally — but their absence proves nothing, and
+  # their presence is not the primary detection path.
+  blockchain_tlds: [".eth", ".sol", ".crypto", ".bit"]
+
+  # serverlist_pull: an HTTP GET carrying a key-like query parameter, seen shortly
+  # after a resolution event. Mirrors the documented Dysphoria flow
+  # `GET /nodes?key=...` to a distribution node (XLab/CNCERT, 24 Jul 2026).
+  serverlist_window_seconds: 120
+  serverlist_query_keys: ["key", "token", "auth", "id"]
+
+  # upnp_addportmapping: SSDP discovery on UDP/1900 plus a SOAP control request to
+  # the gateway's WAN connection service (XLab/CNCERT describe the relay build
+  # mapping 155 ports this way).
+  ssdp_port: 1900
+  upnp_soap_markers: ["AddPortMapping", "WANIPConnection", "WANPPPConnection"]
+
+# ---------------------------------------------------------------------------
 # Models
 # ---------------------------------------------------------------------------
 models:

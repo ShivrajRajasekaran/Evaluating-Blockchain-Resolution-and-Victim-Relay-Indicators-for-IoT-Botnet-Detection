@@ -122,9 +122,22 @@ OPERATIONAL_SOURCES: tuple[str, ...] = (
     SOURCE_OP_FIREWALL,
 )
 
+# A COMPLETE Zeek log set — conn.log plus dns.log, http.log and ssl.log — rather
+# than a connection log alone. This is the only source for which the resolution
+# group is measurable at all.
+#
+# IoT-23 ships conn.log.labeled and nothing else, so a pipeline built on the
+# dataset as distributed can never observe name resolution, an infrastructure
+# fetch, or a TLS server name. Those are precisely the behaviours this project
+# exists to evaluate. Replaying the original captures through Zeek locally
+# regenerates the missing logs (see scripts/run_zeek.py), and this source marks
+# an observation frame built from that fuller telemetry.
+SOURCE_ZEEK_BUNDLE = "zeek_bundle"
+
 SOURCE_DATASETS: tuple[str, ...] = (
     SOURCE_MOCK_LOCAL,
     SOURCE_IOT23,
+    SOURCE_ZEEK_BUNDLE,
 ) + OPERATIONAL_SOURCES
 
 # ---- capture_provenance ----------------------------------------------------
@@ -471,6 +484,50 @@ FEATURE_AVAILABILITY: dict[str, dict[str, str]] = {
     SOURCE_OP_FIREWALL: _flow_availability((
         "rpc_endpoint_ratio", "login_burst_count", "failed_conn_ratio",
         "updownlink_ratio", "bidir_flow_duration", "mean_pkt_size")),
+
+    # ---- complete Zeek log set -------------------------------------------
+    # The one source where the resolution group is measurable. Four of the five
+    # features every flow log must leave NaN become computable here, because the
+    # logs that carry them are present:
+    #
+    #   ens_query_rate       ssl.log server_name (TLS SNI) against the cited
+    #                        RPC-gateway allowlist; http.log host as fallback
+    #   rpc_endpoint_ratio   the same match as a share of the window's sessions
+    #   resolution_entropy   dns.log query names
+    #   serverlist_pull      http.log GET with a key-like parameter following a
+    #                        gateway contact
+    #   upnp_addportmapping  SSDP on UDP/1900 plus a SOAP control request
+    #
+    # rc4_string_score stays UNAVAILABLE. It needs plaintext payload, which no
+    # Zeek log carries, and it is never approximated. Every headline result is
+    # reported both with and without it.
+    #
+    # login_burst_count remains a PROXY for the same reason it is one on IoT-23:
+    # connection attempts to 22/23/2323 are visible, authentication outcomes are
+    # not. rpc_endpoint_ratio is promoted from proxy to computable because it is
+    # no longer inferred from port numbers but read from the server name.
+    SOURCE_ZEEK_BUNDLE: {
+        # resolution — the group this project exists to evaluate
+        "ens_query_rate": AVAIL_COMPUTABLE,
+        "rpc_endpoint_ratio": AVAIL_COMPUTABLE,
+        "resolution_entropy": AVAIL_COMPUTABLE,
+        "serverlist_pull": AVAIL_COMPUTABLE,
+        # relay
+        "bidir_flow_duration": AVAIL_COMPUTABLE,
+        "flow_fanout": AVAIL_COMPUTABLE,
+        "upnp_addportmapping": AVAIL_COMPUTABLE,
+        "updownlink_ratio": AVAIL_COMPUTABLE,
+        # infection
+        "login_burst_count": AVAIL_PROXY,
+        "scan_rate": AVAIL_COMPUTABLE,
+        "distinct_dst_ports": AVAIL_COMPUTABLE,
+        "failed_conn_ratio": AVAIL_COMPUTABLE,
+        # payload
+        "beacon_interval": AVAIL_COMPUTABLE,
+        "beacon_jitter": AVAIL_COMPUTABLE,
+        "rc4_string_score": AVAIL_UNAVAILABLE,   # needs plaintext; never faked
+        "mean_pkt_size": AVAIL_COMPUTABLE,
+    },
 }
 
 

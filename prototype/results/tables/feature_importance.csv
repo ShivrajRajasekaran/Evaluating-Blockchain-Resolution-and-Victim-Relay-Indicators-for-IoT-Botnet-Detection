@@ -1,0 +1,17 @@
+,importance
+rc4_string_score,0.46732262
+login_burst_count,0.09852384
+beacon_jitter,0.088442
+failed_conn_ratio,0.0367851
+scan_rate,0.033781983
+bidir_flow_duration,0.03248739
+updownlink_ratio,0.029695252
+distinct_dst_ports,0.028278494
+flow_fanout,0.027851801
+resolution_entropy,0.027154814
+ens_query_rate,0.027054781
+rpc_endpoint_ratio,0.026726816
+mean_pkt_size,0.022706872
+beacon_interval,0.022075588
+serverlist_pull,0.01802303
+upnp_addportmapping,0.013089648

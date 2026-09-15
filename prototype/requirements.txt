@@ -1,0 +1,29 @@
+# Prototype environment — Anaconda env `shiva`
+#
+# A full, byte-locked spec is in `environment.yml` (conda env export). Recreate with:
+#
+#   conda env create -n shiva -f environment.yml
+#
+# If building from scratch instead, install with conda-forge (ABI-aligned
+# binaries), NOT plain pip, to avoid the numpy/BLAS + matplotlib native crash
+# (Windows fatal exception 0xc06d007f) seen with mismatched wheels:
+#
+#   conda install -n shiva -c conda-forge \
+#       "numpy=2.3.5" "pandas=2.2.3" "scikit-learn=1.9.0" "matplotlib=3.11.0" \
+#       "seaborn=0.13.2" "imbalanced-learn=0.14.2" "xgboost=3.3.0" \
+#       "streamlit=1.60.0" "libblas=*=*openblas"
+#
+# Exact versions this prototype's published results were produced with:
+python==3.13.12
+numpy==2.3.5
+pandas==2.2.3
+scikit-learn==1.9.0
+scipy==1.18.0
+matplotlib==3.11.0
+seaborn==0.13.2
+xgboost==3.3.0
+imbalanced-learn==0.14.2
+streamlit==1.60.0
+# shap -> intentionally omitted (faults on import in this env). Explainability is
+# provided by permutation importance on held-out validation data, with tree gain
+# importance reported alongside only for contrast.

@@ -1,57 +1,45 @@
-# requirements.txt — the product's complete dependency set.
+# Pinned to the versions this codebase is verified green against.
 #
-# Pinned to the versions this build was developed and tested against, because a
-# security tool whose behaviour changes on a transitive upgrade is not a tool
-# anyone should trust. Regenerate deliberately, not incidentally.
+# pandas is held below 3.0 DELIBERATELY. pandas 3 makes copy-on-write mandatory,
+# so DataFrame.to_numpy() returns a READ-ONLY array. The feature derivation in
+# src/features/derive.py assigns into those arrays in place (e.g.
+# `interval[n_gaps < 1] = np.nan`), which raises ValueError under pandas 3 and
+# fails 57 tests. Do not relax this pin without reworking derive.py and
+# re-verifying every published number.
 #
-#   python -m venv .venv && .venv/Scripts/pip install -r requirements.txt
-#   (or: uv venv .venv && uv pip install -r requirements.txt)
-#
-# WHAT IS DELIBERATELY ABSENT, AND WHY
-#   fastapi, pydantic   Starlette alone serves this product; FastAPI's value is
-#                       schema generation from type hints, which is not worth a
-#                       dependency tree here.
-#   sqlalchemy          the repository speaks parameterised SQL directly and is
-#                       already Postgres-portable. An ORM would add a large
-#                       dependency to hide SQL that is better read than hidden.
-#   passlib, bcrypt     hashlib.pbkdf2_hmac is in the standard library, is the
-#                       OWASP-listed choice, and adds no supply-chain surface.
-#   httpx, requests     THIS IS THE IMPORTANT ONE. No outbound HTTP client is
-#                       installed, so the product cannot make one. The HTTP
-#                       tests drive the ASGI app directly through
-#                       tests/asgi_shim.py instead of Starlette's httpx-backed
-#                       TestClient. See tests/test_containment_outbound.py.
-#   psycopg2            PostgreSQL is documented and gated off in this build.
-#   reportlab           reports export as CSV, JSON and printable HTML.
-#
-# PANDAS IS PINNED BELOW 3.0 ON PURPOSE. pandas 3.0 changes timestamp flooring
-# behaviour that src/features/windowing.py relies on for the fixed 5-minute
-# window grid. Upgrading is a deliberate migration, not a version bump.
-
-# ---- the product ----------------------------------------------------------
-starlette==1.6.0          # ASGI framework: routing, requests, responses
-uvicorn==0.52.4           # ASGI server, loopback bind by default
-jinja2==3.1.6             # server-rendered dashboard templates
-itsdangerous==2.2.0       # signed session cookies
-python-multipart==0.0.32  # multipart/form-data parsing for uploads
-pyyaml==6.0.3             # configs/default.yaml
-
-# ---- feature derivation and the research pipeline -------------------------
-numpy==2.4.6
-pandas>=2.2,<3            # see the note above: NOT pandas 3.x
-scikit-learn==1.9.1       # offline evaluation only; no model is served
-matplotlib==3.11.1        # results/figures for the research pipeline
-
-# ---- transitive, pinned for reproducibility -------------------------------
-anyio==4.15.1
-click==8.5.0
-h11==0.16.0
-idna==3.19
+# Regenerate with:  .venv\Scripts\python.exe -m pip freeze
+cloudpickle==3.1.2
+contourpy==1.3.3
+cycler==0.12.1
+fonttools==4.64.0
+imbalanced-learn==0.14.2
+itsdangerous==2.2.0
 joblib==1.6.0
-markupsafe==3.0.3
+kiwisolver==1.5.1
+matplotlib==3.11.1
+narwhals==2.25.0
+numpy==2.5.2
+packaging==26.3
+pandas==2.3.3
+pillow==12.3.0
+pyparsing==3.3.2
 python-dateutil==2.9.0.post0
 pytz==2026.3.post1
-scipy==1.17.1
+PyYAML==6.0.3
+scikit-learn==1.9.0
+scipy==1.18.1
+seaborn==0.13.2
 six==1.17.0
+sklearn-compat==0.1.6
 threadpoolctl==3.6.0
-typing-extensions==4.16.0
+tzdata==2026.3
+xgboost==3.4.1
+
+# ---- the product web layer (src/api) -------------------------------------
+# Starlette + Jinja2 only. No FastAPI, no ORM, no auth framework — and
+# deliberately NO outbound HTTP client: tests/test_containment_outbound.py
+# fails the build if one ever becomes importable from the product tree.
+starlette==1.6.0
+uvicorn==0.52.4
+jinja2==3.1.6
+python-multipart==0.0.32
